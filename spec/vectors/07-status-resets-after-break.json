@@ -1,0 +1,9 @@
+{
+  "description": "Status reports a full session once the user has been away for the rest period, without new usage.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [{ "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 120000 }],
+  "expect": [
+    { "at": 3719999, "blocked": false, "restUntil": null, "remainingMs": 180000 },
+    { "at": 3720000, "blocked": false, "restUntil": null, "remainingMs": 300000 }
+  ]
+}

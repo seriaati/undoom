@@ -1,0 +1,9 @@
+{
+  "description": "Simultaneous use on two devices counts twice; the rest starts after the later one stops.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 200000 },
+    { "kind": "usage", "eventId": "b:1", "startAt": 100000, "durationMs": 150000 }
+  ],
+  "expect": [{ "at": 250000, "blocked": true, "restUntil": 3850000, "remainingMs": 0 }]
+}

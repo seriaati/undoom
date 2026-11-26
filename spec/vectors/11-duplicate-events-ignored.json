@@ -1,0 +1,9 @@
+{
+  "description": "Re-uploaded events with the same eventId are counted once.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 200000 },
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 200000 }
+  ],
+  "expect": [{ "at": 200000, "blocked": false, "restUntil": null, "remainingMs": 100000 }]
+}

@@ -1,0 +1,6 @@
+{
+  "description": "Foreground time counts down the session.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [{ "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 120000 }],
+  "expect": [{ "at": 120000, "blocked": false, "restUntil": null, "remainingMs": 180000 }]
+}

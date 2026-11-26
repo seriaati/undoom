@@ -1,0 +1,9 @@
+{
+  "description": "Leaving for less than the rest period keeps the session's used time.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 120000 },
+    { "kind": "usage", "eventId": "a:2", "startAt": 1920000, "durationMs": 60000 }
+  ],
+  "expect": [{ "at": 1980000, "blocked": false, "restUntil": null, "remainingMs": 120000 }]
+}

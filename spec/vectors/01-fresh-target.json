@@ -1,0 +1,6 @@
+{
+  "description": "A target that was never used has a full session available.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [],
+  "expect": [{ "at": 0, "blocked": false, "restUntil": null, "remainingMs": 300000 }]
+}

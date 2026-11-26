@@ -1,0 +1,10 @@
+{
+  "description": "Reaching the session limit blocks the target for the rest period.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [{ "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 300000 }],
+  "expect": [
+    { "at": 300000, "blocked": true, "restUntil": 3900000, "remainingMs": 0 },
+    { "at": 3899999, "blocked": true, "restUntil": 3900000, "remainingMs": 0 },
+    { "at": 3900000, "blocked": false, "restUntil": null, "remainingMs": 300000 }
+  ]
+}

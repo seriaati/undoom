@@ -1,0 +1,10 @@
+{
+  "description": "Back-to-back usage chunks add up to one session.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 100000 },
+    { "kind": "usage", "eventId": "a:2", "startAt": 100000, "durationMs": 100000 },
+    { "kind": "usage", "eventId": "a:3", "startAt": 200000, "durationMs": 100000 }
+  ],
+  "expect": [{ "at": 300000, "blocked": true, "restUntil": 3900000, "remainingMs": 0 }]
+}

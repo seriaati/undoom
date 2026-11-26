@@ -1,0 +1,13 @@
+{
+  "description": "Offline usage from two devices is merged in time order. Usage after the combined limit restarts the rest.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [
+    { "kind": "usage", "eventId": "a:2", "startAt": 1000000, "durationMs": 200000 },
+    { "kind": "usage", "eventId": "b:1", "startAt": 600000, "durationMs": 200000 },
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 200000 }
+  ],
+  "expect": [
+    { "at": 4799999, "blocked": true, "restUntil": 4800000, "remainingMs": 0 },
+    { "at": 4800000, "blocked": false, "restUntil": null, "remainingMs": 300000 }
+  ]
+}

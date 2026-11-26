@@ -1,0 +1,9 @@
+{
+  "description": "An emergency unlock ends the rest and gives a full session.",
+  "limits": { "sessionMs": 300000, "restMs": 3600000 },
+  "events": [
+    { "kind": "usage", "eventId": "a:1", "startAt": 0, "durationMs": 300000 },
+    { "kind": "unlock", "eventId": "a:2", "at": 400000 }
+  ],
+  "expect": [{ "at": 400000, "blocked": false, "restUntil": null, "remainingMs": 300000 }]
+}
