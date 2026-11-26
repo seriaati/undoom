@@ -1,0 +1,9 @@
+{
+  "name": "undoom",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
