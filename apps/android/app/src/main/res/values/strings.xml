@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Undoom</string>
+    <string name="accessibility_description">Undoom sees which app is in the foreground so it can count your session time, and sends you to the home screen when an app is resting. It doesn\'t read what\'s on screen.</string>
+</resources>
