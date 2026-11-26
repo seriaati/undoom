@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "undoom",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "undoom.seria.moe", "custom_domain": true }],
+  "assets": { "directory": "./public", "run_worker_first": ["/api/*", "/.well-known/*"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "undoom", "database_id": "c705a82c-ddda-40e6-8bc0-81d892ba76c0", "migrations_dir": "migrations" }
+  ],
+  "durable_objects": { "bindings": [{ "name": "USER_HUB", "class_name": "UserHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserHub"] }],
+  "vars": {
+    "RP_ID": "undoom.seria.moe",
+    "ORIGIN": "https://undoom.seria.moe",
+    "ANDROID_PACKAGE": "moe.seria.undoom",
+    // Comma-separated SHA-256 fingerprints (AA:BB:...) of the APK signing certificates.
+    "ANDROID_CERT_FINGERPRINTS": "36:FF:3B:81:6B:06:93:2F:8C:60:7E:79:65:2F:41:84:8E:1B:4E:3A:76:78:A4:DA:A1:FC:B4:40:14:BE:1A:CC"
+  }
+}

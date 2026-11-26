@@ -1,0 +1,26 @@
+{
+  "name": "@undoom/server",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "14.1.0",
+    "@undoom/catalog": "workspace:*",
+    "@undoom/engine": "workspace:*",
+    "hono": "4.13.18",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.8.2",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "wrangler": "4.162.0"
+  }
+}
