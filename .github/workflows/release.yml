@@ -2,10 +2,13 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
 permissions:
   contents: write
+
+# Queue runs so an older push can't overwrite the release of a newer one.
+concurrency: release
 
 jobs:
   release:
@@ -44,11 +47,14 @@ jobs:
           ORG_GRADLE_PROJECT_UNDOOM_KEY_PASSWORD: ${{ secrets.UNDOOM_KEY_PASSWORD }}
         run: ./gradlew test assembleRelease
 
+      # AMO refuses to sign a version twice, so each run appends its run number as a 4th version part.
       - name: Build extension
         run: |
           pnpm install --frozen-lockfile
-          pnpm --filter @undoom/extension test
-          pnpm --filter @undoom/extension zip
+          cd apps/extension
+          npm pkg set version="$(npm pkg get version | tr -d '"').$GITHUB_RUN_NUMBER"
+          pnpm test
+          pnpm run zip
 
       # Unlisted (self-distributed) signing: AMO signs automatically without a public listing.
       # The bundle is minified, so AMO's policy requires the readable sources alongside it.
@@ -63,10 +69,13 @@ jobs:
             --upload-source-code *-sources.zip
 
       # Fixed asset names keep /releases/latest/download/<name> pointing at the newest build.
-      - name: Publish release
+      - name: Publish rolling "latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp apps/android/app/build/outputs/apk/release/app-release.apk undoom.apk
           cp apps/extension/.output/signed/*.xpi undoom-firefox.xpi
-          gh release create "$GITHUB_REF_NAME" undoom.apk undoom-firefox.xpi --generate-notes
+          git tag -f latest
+          git push -f origin refs/tags/latest
+          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Latest build" --notes "Built automatically from the latest commit on main." --latest
+          gh release upload latest undoom.apk undoom-firefox.xpi --clobber
