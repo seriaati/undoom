@@ -1,0 +1,30 @@
+{
+  "name": "@undoom/extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "wxt -b firefox",
+    "build": "wxt build -b firefox",
+    "zip": "wxt zip -b firefox",
+    "postinstall": "wxt prepare",
+    "test": "vitest run",
+    "typecheck": "wxt prepare && tsc -p ."
+  },
+  "dependencies": {
+    "@undoom/catalog": "workspace:*",
+    "@undoom/engine": "workspace:*",
+    "react": "19.1.10",
+    "react-dom": "19.1.10"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.11",
+    "@types/react-dom": "19.1.11",
+    "@wxt-dev/module-react": "1.2.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0",
+    "wxt": "0.21.5"
+  }
+}
