@@ -1,0 +1,23 @@
+[
+  { "id": "reddit", "name": "Reddit", "domains": ["reddit.com", "redd.it"], "packages": ["com.reddit.frontpage"] },
+  { "id": "x", "name": "X (Twitter)", "domains": ["x.com", "twitter.com"], "packages": ["com.twitter.android"] },
+  { "id": "instagram", "name": "Instagram", "domains": ["instagram.com"], "packages": ["com.instagram.android"] },
+  { "id": "facebook", "name": "Facebook", "domains": ["facebook.com", "fb.com"], "packages": ["com.facebook.katana", "com.facebook.lite"] },
+  { "id": "tiktok", "name": "TikTok", "domains": ["tiktok.com"], "packages": ["com.zhiliaoapp.musically", "com.ss.android.ugc.trill"] },
+  { "id": "youtube", "name": "YouTube", "domains": ["youtube.com", "youtu.be"], "packages": ["com.google.android.youtube"] },
+  { "id": "threads", "name": "Threads", "domains": ["threads.com", "threads.net"], "packages": ["com.instagram.barcelona"] },
+  { "id": "bluesky", "name": "Bluesky", "domains": ["bsky.app"], "packages": ["xyz.blueskyweb.app"] },
+  { "id": "linkedin", "name": "LinkedIn", "domains": ["linkedin.com"], "packages": ["com.linkedin.android"] },
+  { "id": "pinterest", "name": "Pinterest", "domains": ["pinterest.com"], "packages": ["com.pinterest"] },
+  { "id": "snapchat", "name": "Snapchat", "domains": ["snapchat.com"], "packages": ["com.snapchat.android"] },
+  { "id": "tumblr", "name": "Tumblr", "domains": ["tumblr.com"], "packages": ["com.tumblr"] },
+  { "id": "twitch", "name": "Twitch", "domains": ["twitch.tv"], "packages": ["tv.twitch.android.app"] },
+  { "id": "9gag", "name": "9GAG", "domains": ["9gag.com"], "packages": ["com.ninegag.android.app"] },
+  { "id": "hackernews", "name": "Hacker News", "domains": ["news.ycombinator.com"], "packages": [] },
+  { "id": "dcard", "name": "Dcard", "domains": ["dcard.tw"], "packages": ["com.sparkslab.dcardreader"] },
+  { "id": "ptt", "name": "PTT", "domains": ["ptt.cc"], "packages": [] },
+  { "id": "bilibili", "name": "Bilibili", "domains": ["bilibili.com", "b23.tv"], "packages": ["tv.danmaku.bili"] },
+  { "id": "weibo", "name": "Weibo", "domains": ["weibo.com", "weibo.cn"], "packages": ["com.sina.weibo"] },
+  { "id": "xiaohongshu", "name": "Xiaohongshu (RED)", "domains": ["xiaohongshu.com"], "packages": ["com.xingin.xhs"] },
+  { "id": "douyin", "name": "Douyin", "domains": ["douyin.com"], "packages": ["com.ss.android.ugc.aweme"] }
+]
