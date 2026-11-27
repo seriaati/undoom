@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -138,8 +139,11 @@ fun EntryIcon(entry: Entry, size: Dp) {
             if (it != null) {
                 Image(it, contentDescription = null, Modifier.size(size))
             } else {
+                // Unbounded so the theme's 24sp line height can't be squeezed into a small icon, which
+                // clipped the letter; the box then centres the whole line.
                 Text(
                     entry.name.take(1).uppercase(),
+                    Modifier.wrapContentSize(unbounded = true),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Bold,
                     fontSize = (size.value * 0.7f).sp,
