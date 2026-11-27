@@ -37,6 +37,8 @@ android {
         release {
             buildConfigField("String", "API_URL", "\"https://undoom.seria.moe\"")
             signingConfig = signingConfigs.findByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 
