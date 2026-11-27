@@ -152,7 +152,8 @@ private fun rememberAppIcon(packages: List<String>): ImageBitmap? {
 fun EntryIcon(entry: Entry, size: Dp) {
     val icon = rememberAppIcon(entry.packages)
     Crossfade(icon, Modifier.size(size), label = "icon") {
-        Box(contentAlignment = Alignment.Center) {
+        // Crossfade puts its content at the top start, so the box has to fill it to centre the letter.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (it != null) {
                 Image(it, contentDescription = null, Modifier.size(size))
             } else {
