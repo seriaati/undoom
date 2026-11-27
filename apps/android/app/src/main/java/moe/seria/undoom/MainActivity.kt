@@ -222,6 +222,8 @@ private fun TargetsScreen(activity: MainActivity, resumes: Int, saved: Saved, op
     val now = rememberNow()
     val enabled = remember(resumes) { serviceEnabled(activity) }
     val targets = Repo.effective(saved, now).targets
+    val update by Updater.available.collectAsState()
+    LaunchedEffect(resumes) { Updater.check() }
     Scaffold(
         topBar = {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -254,6 +256,7 @@ private fun TargetsScreen(activity: MainActivity, resumes: Int, saved: Saved, op
             contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (update) item(key = "update") { Box(Modifier.animateItem()) { UpdateCard() } }
             if (!enabled) item(key = "onboarding") { Box(Modifier.animateItem()) { Onboarding(activity) } }
             if (targets.isEmpty()) item(key = "empty") { Box(Modifier.animateItem()) { EmptyState() } }
             items(targets, key = { it.id }) { target ->

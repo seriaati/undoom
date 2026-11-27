@@ -12,7 +12,8 @@ android {
         applicationId = "moe.seria.undoom"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1
+        // CI passes its run number so each published APK is newer than the last; the updater compares these.
+        versionCode = providers.gradleProperty("UNDOOM_VERSION_CODE").orNull?.toInt() ?: 1
         versionName = "0.1.0"
     }
 

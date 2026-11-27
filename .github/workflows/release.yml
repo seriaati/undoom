@@ -45,6 +45,7 @@ jobs:
           ORG_GRADLE_PROJECT_UNDOOM_STORE_PASSWORD: ${{ secrets.UNDOOM_STORE_PASSWORD }}
           ORG_GRADLE_PROJECT_UNDOOM_KEY_ALIAS: ${{ secrets.UNDOOM_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_UNDOOM_KEY_PASSWORD: ${{ secrets.UNDOOM_KEY_PASSWORD }}
+          ORG_GRADLE_PROJECT_UNDOOM_VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew test assembleRelease
 
       # AMO refuses to sign a version twice, so each run appends its run number as a 4th version part.
@@ -72,6 +73,8 @@ jobs:
       # updates.json is the Firefox update manifest that the extension's update_url points at.
       # Firefox rejects an update whose file doesn't match the listed version and hash, so a
       # check that lands between two uploads just fails and retries on the next check.
+      # undoom-android.json is what the Android app's updater polls. It goes up after the APK so the
+      # app never sees a new versionCode while the old APK is still being served.
       - name: Publish rolling "latest" release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,7 +88,9 @@ jobs:
             --arg hash "sha256:$(sha256sum undoom-firefox.xpi | cut -d' ' -f1)" \
             '{addons: {($id): {updates: [{version: $version, update_link: $link, update_hash: $hash}]}}}' > updates.json
           cat updates.json
+          jq -n --argjson versionCode "$GITHUB_RUN_NUMBER" '{versionCode: $versionCode}' > undoom-android.json
           git tag -f latest
           git push -f origin refs/tags/latest
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "Latest build" --notes "Built automatically from the latest commit on main." --latest
           gh release upload latest undoom.apk undoom-firefox.xpi updates.json --clobber
+          gh release upload latest undoom-android.json --clobber
