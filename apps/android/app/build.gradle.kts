@@ -12,9 +12,9 @@ android {
         applicationId = "moe.seria.undoom"
         minSdk = 28
         targetSdk = 37
-        // CI passes its run number so each published APK is newer than the last; the updater compares these.
+        // CI derives both from the release tag; the updater compares versionCode.
         versionCode = providers.gradleProperty("UNDOOM_VERSION_CODE").orNull?.toInt() ?: 1
-        versionName = "0.1.0"
+        versionName = providers.gradleProperty("UNDOOM_VERSION_NAME").orNull ?: "0.1.0"
     }
 
     // Passkeys are bound to this key's fingerprint (ANDROID_CERT_FINGERPRINTS on the

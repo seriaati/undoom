@@ -2,19 +2,23 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: write
-
-# Queue runs so an older push can't overwrite the release of a newer one.
-concurrency: release
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Read version from tag
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "Tag must look like v1.2.3"; exit 1; }
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          # Room for minor and patch up to 999 each while staying under Android's 2100000000 cap.
+          echo "VERSION_CODE=$(( BASH_REMATCH[1] * 1000000 + BASH_REMATCH[2] * 1000 + BASH_REMATCH[3] ))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v5
         with:
@@ -45,15 +49,15 @@ jobs:
           ORG_GRADLE_PROJECT_UNDOOM_STORE_PASSWORD: ${{ secrets.UNDOOM_STORE_PASSWORD }}
           ORG_GRADLE_PROJECT_UNDOOM_KEY_ALIAS: ${{ secrets.UNDOOM_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_UNDOOM_KEY_PASSWORD: ${{ secrets.UNDOOM_KEY_PASSWORD }}
-          ORG_GRADLE_PROJECT_UNDOOM_VERSION_CODE: ${{ github.run_number }}
+          ORG_GRADLE_PROJECT_UNDOOM_VERSION_CODE: ${{ env.VERSION_CODE }}
+          ORG_GRADLE_PROJECT_UNDOOM_VERSION_NAME: ${{ env.VERSION }}
         run: ./gradlew test assembleRelease
 
-      # AMO refuses to sign a version twice, so each run appends its run number as a 4th version part.
       - name: Build extension
         run: |
           pnpm install --frozen-lockfile
           cd apps/extension
-          npm pkg set version="$(npm pkg get version | tr -d '"').$GITHUB_RUN_NUMBER"
+          npm pkg set version="$VERSION"
           pnpm test
           pnpm run zip
 
@@ -69,13 +73,10 @@ jobs:
             --source-dir firefox-mv2 --artifacts-dir signed \
             --upload-source-code *-sources.zip
 
-      # Fixed asset names keep /releases/latest/download/<name> pointing at the newest build.
-      # updates.json is the Firefox update manifest that the extension's update_url points at.
-      # Firefox rejects an update whose file doesn't match the listed version and hash, so a
-      # check that lands between two uploads just fails and retries on the next check.
-      # undoom-android.json is what the Android app's updater polls. It goes up after the APK so the
-      # app never sees a new versionCode while the old APK is still being served.
-      - name: Publish rolling "latest" release
+      # The extension's update_url and the Android updater read updates.json and undoom-android.json
+      # through /releases/latest/download/, so they follow whichever release is marked Latest.
+      # gh uploads the assets to a draft and publishes it after, so they all appear at once.
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -83,14 +84,10 @@ jobs:
           cp apps/extension/.output/signed/*.xpi undoom-firefox.xpi
           jq -n \
             --arg id "$(jq -r .browser_specific_settings.gecko.id apps/extension/.output/firefox-mv2/manifest.json)" \
-            --arg version "$(jq -r .version apps/extension/.output/firefox-mv2/manifest.json)" \
-            --arg link "https://github.com/$GITHUB_REPOSITORY/releases/download/latest/undoom-firefox.xpi" \
+            --arg version "$VERSION" \
+            --arg link "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/undoom-firefox.xpi" \
             --arg hash "sha256:$(sha256sum undoom-firefox.xpi | cut -d' ' -f1)" \
             '{addons: {($id): {updates: [{version: $version, update_link: $link, update_hash: $hash}]}}}' > updates.json
           cat updates.json
-          jq -n --argjson versionCode "$GITHUB_RUN_NUMBER" '{versionCode: $versionCode}' > undoom-android.json
-          git tag -f latest
-          git push -f origin refs/tags/latest
-          gh release view latest >/dev/null 2>&1 || gh release create latest --title "Latest build" --notes "Built automatically from the latest commit on main." --latest
-          gh release upload latest undoom.apk undoom-firefox.xpi updates.json --clobber
-          gh release upload latest undoom-android.json --clobber
+          jq -n --argjson versionCode "$VERSION_CODE" '{versionCode: $versionCode}' > undoom-android.json
+          gh release create "$GITHUB_REF_NAME" undoom.apk undoom-firefox.xpi updates.json undoom-android.json --generate-notes

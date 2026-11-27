@@ -35,9 +35,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import okhttp3.Request
 
-/** Self-update for sideloaded installs, from the rolling "latest" GitHub release that CI publishes. */
+/** Self-update for sideloaded installs, from whichever GitHub release is marked Latest. */
 object Updater {
-    private const val RELEASE = "https://github.com/seriaati/undoom/releases/download/latest"
+    private const val RELEASE = "https://github.com/seriaati/undoom/releases/latest/download"
 
     @Serializable
     private data class Latest(val versionCode: Int)

@@ -8,8 +8,8 @@ Undoom limits how long each session on a site or
 app can last and requires a rest before the next one, synced across your Firefox
 and Android devices.
 
-- [Download Firefox extension](https://github.com/seriaati/undoom/releases/download/latest/undoom-firefox.xpi)
-- [Download Android apk](https://github.com/seriaati/undoom/releases/download/latest/undoom.apk)
+- [Download Firefox extension](https://github.com/seriaati/undoom/releases/latest/download/undoom-firefox.xpi)
+- [Download Android apk](https://github.com/seriaati/undoom/releases/latest/download/undoom.apk)
 
 ## Motive
 
