@@ -2,6 +2,8 @@ export interface Entry {
   id: string;
   name: string;
   domains: string[];
+  /** Subdomains of `domains` that belong to a different service, such as music.youtube.com. */
+  excludeDomains?: string[];
   packages: string[];
 }
 
@@ -115,7 +117,12 @@ function targetsMatching(
 
 export function targetsForHost(config: Config, catalog: readonly Entry[], host: string): Target[] {
   const h = host.toLowerCase().replace(/\.$/, "");
-  return targetsMatching(config, catalog, (e) => e.domains.some((d) => hostMatches(h, d)));
+  const excluded = (domains: string[] | undefined) => (domains ?? []).some((d) => hostMatches(h, d));
+  return targetsMatching(
+    config,
+    catalog,
+    (e) => e.domains.some((d) => hostMatches(h, d)) && !excluded(e.excludeDomains),
+  );
 }
 
 export function targetsForPackage(config: Config, catalog: readonly Entry[], pkg: string): Target[] {

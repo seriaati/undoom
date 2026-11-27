@@ -105,6 +105,15 @@ describe("matching", () => {
     expect(targetsForHost(config, catalog, "www.news.example").map((t) => t.id)).toEqual(["t2"]);
   });
 
+  test("skips excluded subdomains", () => {
+    const catalog: Entry[] = [
+      { id: "youtube", name: "YouTube", domains: ["youtube.com"], excludeDomains: ["music.youtube.com"], packages: [] },
+    ];
+    const config: Config = { ...base, targets: [{ ...reddit, id: "yt", entryIds: ["youtube"], pending: null }] };
+    expect(targetsForHost(config, catalog, "music.youtube.com")).toEqual([]);
+    expect(targetsForHost(config, catalog, "m.youtube.com").map((t) => t.id)).toEqual(["yt"]);
+  });
+
   test("matches Android packages", () => {
     expect(targetsForPackage(config, catalog, "com.reddit.frontpage").map((t) => t.id)).toEqual(["t1"]);
     expect(targetsForPackage(config, catalog, "com.example")).toEqual([]);

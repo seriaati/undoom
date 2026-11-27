@@ -4,7 +4,7 @@
   { "id": "instagram", "name": "Instagram", "domains": ["instagram.com"], "packages": ["com.instagram.android"] },
   { "id": "facebook", "name": "Facebook", "domains": ["facebook.com", "fb.com"], "packages": ["com.facebook.katana", "com.facebook.lite"] },
   { "id": "tiktok", "name": "TikTok", "domains": ["tiktok.com"], "packages": ["com.zhiliaoapp.musically", "com.ss.android.ugc.trill"] },
-  { "id": "youtube", "name": "YouTube", "domains": ["youtube.com", "youtu.be"], "packages": ["com.google.android.youtube"] },
+  { "id": "youtube", "name": "YouTube", "domains": ["youtube.com", "youtu.be"], "excludeDomains": ["music.youtube.com"], "packages": ["com.google.android.youtube"] },
   { "id": "threads", "name": "Threads", "domains": ["threads.com", "threads.net"], "packages": ["com.instagram.barcelona"] },
   { "id": "bluesky", "name": "Bluesky", "domains": ["bsky.app"], "packages": ["xyz.blueskyweb.app"] },
   { "id": "linkedin", "name": "LinkedIn", "domains": ["linkedin.com"], "packages": ["com.linkedin.android"] },
