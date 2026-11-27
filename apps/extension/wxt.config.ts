@@ -22,6 +22,9 @@ export default defineConfig({
       gecko: {
         id: "undoom@seria.moe",
         strict_min_version: "140.0",
+        // Installed copies keep checking the URL they were installed with, so this must never move.
+        // The release workflow writes updates.json to the rolling "latest" release on every push.
+        update_url: "https://github.com/seriaati/undoom/releases/download/latest/updates.json",
         // Time spent on the user's limited sites is synced to the Undoom server.
         data_collection_permissions: { required: ["browsingActivity"] },
       },

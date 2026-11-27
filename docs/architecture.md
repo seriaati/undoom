@@ -149,6 +149,10 @@ that reads `spec/` and `packages/catalog/` as plain JSON.
   extension. Adding a passkey uses the same flow with `mode=add`. *(The
   redirect hand-off is verified in Firefox; the passkey prompt inside the
   auth window still needs a check in a normal, non-headless Firefox.)*
+- Distribution: signed as an unlisted add-on on AMO and attached to the rolling
+  `latest` GitHub release. Installed copies auto-update through the manifest's
+  `update_url`, which points at the `updates.json` that CI writes next to the
+  `.xpi` on every push to `main`.
 
 ### Android app
 

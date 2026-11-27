@@ -69,13 +69,23 @@ jobs:
             --upload-source-code *-sources.zip
 
       # Fixed asset names keep /releases/latest/download/<name> pointing at the newest build.
+      # updates.json is the Firefox update manifest that the extension's update_url points at.
+      # Firefox rejects an update whose file doesn't match the listed version and hash, so a
+      # check that lands between two uploads just fails and retries on the next check.
       - name: Publish rolling "latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp apps/android/app/build/outputs/apk/release/app-release.apk undoom.apk
           cp apps/extension/.output/signed/*.xpi undoom-firefox.xpi
+          jq -n \
+            --arg id "$(jq -r .browser_specific_settings.gecko.id apps/extension/.output/firefox-mv2/manifest.json)" \
+            --arg version "$(jq -r .version apps/extension/.output/firefox-mv2/manifest.json)" \
+            --arg link "https://github.com/$GITHUB_REPOSITORY/releases/download/latest/undoom-firefox.xpi" \
+            --arg hash "sha256:$(sha256sum undoom-firefox.xpi | cut -d' ' -f1)" \
+            '{addons: {($id): {updates: [{version: $version, update_link: $link, update_hash: $hash}]}}}' > updates.json
+          cat updates.json
           git tag -f latest
           git push -f origin refs/tags/latest
           gh release view latest >/dev/null 2>&1 || gh release create latest --title "Latest build" --notes "Built automatically from the latest commit on main." --latest
-          gh release upload latest undoom.apk undoom-firefox.xpi --clobber
+          gh release upload latest undoom.apk undoom-firefox.xpi updates.json --clobber
