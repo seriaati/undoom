@@ -2,7 +2,9 @@
 
 # Undoom
 
-Cut the doom, keep the scroll. Undoom limits how long each session on a site or
+<img src="apps/server/public/og.png" alt="Undoom: Stop the doom, keep the scroll.">
+
+Undoom limits how long each session on a site or
 app can last and requires a rest before the next one, synced across your Firefox
 and Android devices.
 
