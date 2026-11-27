@@ -1,5 +1,6 @@
 package moe.seria.undoom
 
+import android.graphics.BitmapFactory
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
@@ -58,6 +59,7 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.Request
 
 private val lightColors = lightColorScheme(
     primary = Color(0xFF2B5A8A),
@@ -132,25 +134,43 @@ fun Logo(size: Dp) {
     Image(painterResource(R.drawable.logo), contentDescription = null, Modifier.size(size))
 }
 
-/** Loaded icons by package, so scrolling the app list doesn't decode them again. Only touched on the main thread. */
-private val appIcons = HashMap<String, ImageBitmap>()
+/** Loaded icons by package or domain, so scrolling the list doesn't decode or download them again. Only touched on the main thread. */
+private val icons = HashMap<String, ImageBitmap>()
 
-/** The icon of the first installed package, or null while loading or when none is installed. */
+/** Domains whose favicon failed to load, so scrolling past them doesn't download it again. Only touched on the main thread. */
+private val missingFavicons = HashSet<String>()
+
+/** Fetched from the site itself rather than a favicon service, so the list of limited sites stays private. */
+private fun loadFavicon(domain: String): ImageBitmap? = runCatching {
+    Repo.http.newCall(Request.Builder().url("https://$domain/favicon.ico").build()).execute().use { response ->
+        if (!response.isSuccessful) return null
+        BitmapFactory.decodeStream(response.body.byteStream())?.asImageBitmap()
+    }
+}.getOrNull()
+
+/**
+ * The icon of the first installed package, else the first domain's favicon, or null while loading
+ * or when there is neither.
+ */
 @Composable
-private fun rememberAppIcon(packages: List<String>): ImageBitmap? {
+private fun rememberEntryIcon(entry: Entry): ImageBitmap? {
     val pm = LocalContext.current.packageManager
-    return produceState(packages.firstNotNullOfOrNull { appIcons[it] }, packages) {
+    return produceState((entry.packages + entry.domains).firstNotNullOfOrNull { icons[it] }, entry) {
         if (value != null) return@produceState
-        value = withContext(Dispatchers.IO) {
-            packages.firstNotNullOfOrNull { runCatching { it to pm.getApplicationIcon(it).toBitmap().asImageBitmap() }.getOrNull() }
-        }?.let { (pkg, icon) -> icon.also { appIcons[pkg] = it } }
+        val domain = entry.domains.firstOrNull()?.takeIf { it !in missingFavicons }
+        val loaded = withContext(Dispatchers.IO) {
+            entry.packages.firstNotNullOfOrNull { runCatching { it to pm.getApplicationIcon(it).toBitmap().asImageBitmap() }.getOrNull() }
+                ?: domain?.let { d -> loadFavicon(d)?.let { d to it } }
+        }
+        if (loaded == null && domain != null) missingFavicons += domain
+        value = loaded?.let { (key, icon) -> icon.also { icons[key] = it } }
     }.value
 }
 
-/** An entry's app icon, or its first letter when the app isn't installed. */
+/** An entry's app icon or site favicon, or its first letter when it has neither. */
 @Composable
 fun EntryIcon(entry: Entry, size: Dp) {
-    val icon = rememberAppIcon(entry.packages)
+    val icon = rememberEntryIcon(entry)
     Crossfade(icon, Modifier.size(size), label = "icon") {
         // Crossfade puts its content at the top start, so the box has to fill it to centre the letter.
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
