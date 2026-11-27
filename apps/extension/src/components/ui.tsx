@@ -1,5 +1,5 @@
 import type { Entry } from "@undoom/engine";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatCountdown, formatMinutes, type Timer } from "@/lib/format";
 
 export function Logo({ size = 24 }: { size?: number }) {
@@ -66,12 +66,37 @@ export const ArrowLeftIcon = () => <Icon d="M19 12H5M12 19l-7-7 7-7" />;
 
 /** The site's own favicon, fetched from the site rather than a favicon service so the list of limited sites stays private. */
 export function Favicon({ entry }: { entry: Entry }) {
+  const [src, setSrc] = useState<string>();
   const [failed, setFailed] = useState(false);
   const domain = entry.domains[0];
-  if (domain === undefined || failed) {
+
+  // Fetched rather than put straight in <img src>: sites like Instagram send
+  // Cross-Origin-Resource-Policy: same-origin, which blocks the <img> load from an extension page
+  // but doesn't apply to a CORS fetch, and <all_urls> lets the extension make that fetch.
+  useEffect(() => {
+    if (domain === undefined) return;
+    let url: string | undefined;
+    let cancelled = false;
+    setSrc(undefined);
+    setFailed(false);
+    fetch(`https://${domain}/favicon.ico`)
+      .then((res) => (res.ok ? res.blob() : Promise.reject()))
+      .then((blob) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [domain]);
+
+  if (src === undefined || failed) {
     return <span className="favicon letter">{entry.name.charAt(0).toUpperCase()}</span>;
   }
-  return <img className="favicon" src={`https://${domain}/favicon.ico`} alt="" onError={() => setFailed(true)} />;
+  return <img className="favicon" src={src} alt="" onError={() => setFailed(true)} />;
 }
 
 /** One entry's icon, or up to four in a grid for a group. */
