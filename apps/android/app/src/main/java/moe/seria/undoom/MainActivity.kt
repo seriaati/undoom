@@ -16,8 +16,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,7 +30,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -84,8 +81,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -226,7 +221,12 @@ private fun TargetsScreen(activity: MainActivity, resumes: Int, saved: Saved, op
     LaunchedEffect(resumes) { Updater.check() }
     Scaffold(
         topBar = {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Logo(32.dp)
                 Text("Undoom", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em)
                 OutlinedIconButton(
                     onClick = { open(Screen.Account) },
@@ -320,12 +320,18 @@ private fun LimitCard(target: Target, saved: Saved, now: Long, onClick: () -> Un
                 IconText(R.drawable.ic_hourglass, formatLimit(target.sessionMs), "Session")
                 IconText(R.drawable.ic_moon, formatLimit(target.restMs), "Rest")
             }
-            when (target.pending) {
-                PendingChange.Delete -> Muted("Will be removed after the current rest")
-                is PendingChange.Update -> Muted("Changes apply after the current rest")
-                null -> {}
-            }
+            pendingText(target, saved)?.let { Muted(it) }
         }
+    }
+}
+
+private fun pendingText(target: Target, saved: Saved): String? = when (val pending = target.pending) {
+    null -> null
+    PendingChange.Delete -> "Will be removed after the current rest."
+    is PendingChange.Update -> {
+        val removed = target.entryIds.filter { it !in pending.entryIds }.map { entryName(it, saved) }
+        val apps = if (removed.isEmpty()) "" else ", removing ${removed.joinToString()}"
+        "Changes apply after the current rest: session ${formatLimit(pending.sessionMs)}, rest ${formatLimit(pending.restMs)}$apps."
     }
 }
 
@@ -356,13 +362,6 @@ private fun IconText(@DrawableRes icon: Int, text: String, description: String, 
 }
 
 @Composable
-private fun IconLabel(@DrawableRes icon: Int, text: String) {
-    Icon(painterResource(icon), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
-    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-    Text(text)
-}
-
-@Composable
 private fun Pill(phase: Phase) {
     val colors = MaterialTheme.colorScheme
     val (background, content) = when (phase) {
@@ -382,43 +381,6 @@ private fun Pill(phase: Phase) {
             Text(shown.label, color = animatedContent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
         }
     }
-}
-
-@Composable
-private fun Countdown(ms: Long, label: String, color: Color) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            formatDuration(ms),
-            Modifier.alignByBaseline(),
-            color = color,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-0.02).em,
-            style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"),
-        )
-        Muted(label, Modifier.alignByBaseline())
-    }
-}
-
-@Composable
-private fun Bar(fraction: Float, color: Color) {
-    // Matches the one-second tick so the bar glides instead of stepping.
-    val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(1_000, easing = LinearEasing), label = "bar")
-    Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
-        Box(Modifier.fillMaxWidth(animated).fillMaxHeight().clip(CircleShape).background(color))
-    }
-}
-
-@Composable
-private fun Muted(text: String, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE) {
-    Text(
-        text,
-        modifier,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodySmall,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
-    )
 }
 
 @Composable
@@ -545,10 +507,10 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
     val restMin = rest.toLongOrNull()?.takeIf { it in 1..7 * 24 * 60 }
     val trimmedName = name.trim().take(100).ifEmpty { null }
     val error = when {
-        selected.isEmpty() -> "Pick at least one app"
-        selected.size > 1 && trimmedName == null -> "A group of apps needs a name"
-        sessionMin == null -> "Sessions can be 1 to 1440 minutes"
-        restMin == null -> "Rests can be 1 to 10080 minutes"
+        selected.isEmpty() -> "Add an app first."
+        selected.size > 1 && trimmedName == null -> "Give the group a name."
+        sessionMin == null -> "Session must be 1–1440 whole minutes."
+        restMin == null -> "Rest must be 1–10080 whole minutes."
         else -> null
     }
     val resting = targetId != null && config.targets.find { it.id == targetId }

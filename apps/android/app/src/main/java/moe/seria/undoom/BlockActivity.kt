@@ -8,23 +8,31 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,10 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.random.Random
 
 class BlockActivity : ComponentActivity() {
@@ -61,7 +70,18 @@ class BlockActivity : ComponentActivity() {
     }
 }
 
-private fun question() = Random.nextInt(3, 13) to Random.nextInt(3, 13)
+private data class Question(val text: String, val answer: Int)
+
+// Same sums as newQuestion in the extension's question.ts.
+private fun newQuestion(): Question = if (Random.nextBoolean()) {
+    val a = Random.nextInt(3, 13)
+    val b = Random.nextInt(3, 13)
+    Question("$a × $b", a * b)
+} else {
+    val a = Random.nextInt(12, 90)
+    val b = Random.nextInt(12, 90)
+    Question("$a + $b", a + b)
+}
 
 @Composable
 private fun BlockScreen(targetId: String, close: () -> Unit) {
@@ -73,54 +93,38 @@ private fun BlockScreen(targetId: String, close: () -> Unit) {
     LaunchedEffect(status?.blocked) {
         if (status?.blocked != true) close()
     }
-    if (target == null || status?.restUntil == null) return
+    val restUntil = status?.restUntil
+    if (target == null || restUntil == null) return
 
     var showUnlock by remember { mutableStateOf(false) }
-    var q by remember { mutableStateOf(question()) }
-    var answer by remember { mutableStateOf("") }
-    var wrong by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
 
-    fun submit() {
-        if (answer.toIntOrNull() == q.first * q.second) {
-            Repo.unlock(target.id)
-        } else {
-            wrong = true
-            q = question()
-            answer = ""
-        }
-    }
-
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Tile(targetEntries(target, saved), 72.dp)
-        Spacer(Modifier.height(16.dp))
-        Text(displayName(target, saved), style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text("Time for a break", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(24.dp))
-        Text(formatDuration(status.restUntil - now), style = MaterialTheme.typography.displayLarge)
-        Text("until your next session")
-        Spacer(Modifier.height(48.dp))
-        AnimatedContent(showUnlock, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "unlock") { unlocking ->
-            if (!unlocking) {
-                TextButton(onClick = { showUnlock = true }) { UnlockLabel("Emergency unlock") }
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("What is ${q.first} × ${q.second}?", style = MaterialTheme.typography.titleLarge)
-                    AnimatedVisibility(wrong) { Text("Not quite. Try this one.", color = MaterialTheme.colorScheme.error) }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = answer,
-                        onValueChange = { answer = it.filter(Char::isDigit) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { submit() }),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = ::submit) { UnlockLabel("Unlock") }
+    // Scrolls so the open keyboard can't push the unlock field off screen; heightIn keeps the card centred otherwise.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.verticalScroll(rememberScrollState()).fillMaxWidth().heightIn(min = maxHeight).padding(horizontal = 16.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            OutlinedCard(Modifier.widthIn(max = 380.dp).fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.animateContentSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Brand()
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Tile(targetEntries(target, saved), 56.dp)
+                        Text("${displayName(target, saved)} is resting", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Countdown(restUntil - now, "until the next session", colors.error, fontSize = 40.sp)
+                    Bar(1f - (restUntil - now).toFloat() / target.restMs, colors.error)
+                    AnimatedContent(showUnlock, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "unlock") { unlocking ->
+                        if (unlocking) {
+                            Unlock { Repo.unlock(target.id) }
+                        } else {
+                            TextButton(
+                                onClick = { showUnlock = true },
+                                contentPadding = PaddingValues(vertical = 8.dp),
+                                colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurfaceVariant),
+                            ) { IconLabel(R.drawable.ic_lock_open, "I need it now") }
+                        }
+                    }
                 }
             }
         }
@@ -128,8 +132,37 @@ private fun BlockScreen(targetId: String, close: () -> Unit) {
 }
 
 @Composable
-private fun UnlockLabel(text: String) {
-    Icon(painterResource(R.drawable.ic_lock_open), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
-    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-    Text(text)
+private fun Unlock(unlock: () -> Unit) {
+    var question by remember { mutableStateOf(newQuestion()) }
+    var answer by remember { mutableStateOf("") }
+    var wrong by remember { mutableStateOf(false) }
+
+    fun submit() {
+        if (answer.toIntOrNull() == question.answer) {
+            unlock()
+        } else {
+            wrong = true
+            question = newQuestion()
+            answer = ""
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider(Modifier.padding(bottom = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Emergency unlock", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text("This ends the rest and starts a new session.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${question.text} =")
+            OutlinedTextField(
+                value = answer,
+                onValueChange = { answer = it.filter(Char::isDigit) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
+            )
+            Button(onClick = ::submit) { IconLabel(R.drawable.ic_lock_open, "Unlock") }
+        }
+        AnimatedVisibility(wrong) { Text("Not quite. Try this one.", color = MaterialTheme.colorScheme.error) }
+    }
 }
