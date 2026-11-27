@@ -492,7 +492,7 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
     val all by produceState(emptyList<Candidate>(), known) {
         value = withContext(Dispatchers.IO) { candidates(activity, known) }
     }
-    val taken = (desired.targets + config.targets.map { TargetEdit(it.id, it.name, it.entryIds, it.sessionMs, it.restMs) })
+    val taken = (desired.targets + config.targets.map { it.toEdit() })
         .filter { it.id != targetId }
         .flatMap { it.entryIds }
         .toSet()
@@ -540,7 +540,14 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                     Button(
                         enabled = error == null,
                         onClick = {
-                            val edit = TargetEdit(targetId ?: UUID.randomUUID().toString(), trimmedName, selected.toList(), sessionMin!! * MINUTE, restMin!! * MINUTE)
+                            val edit = TargetEdit(
+                                targetId ?: UUID.randomUUID().toString(),
+                                trimmedName,
+                                selected.toList(),
+                                sessionMin!! * MINUTE,
+                                restMin!! * MINUTE,
+                                existing?.excludeDomains.orEmpty(),
+                            )
                             save(if (existing == null) desired.targets + edit else desired.targets.map { if (it.id == edit.id) edit else it })
                         },
                         modifier = Modifier.padding(end = 8.dp),

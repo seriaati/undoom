@@ -86,7 +86,12 @@ data class Entry(val id: String, val name: String, val domains: List<String>, va
 sealed interface PendingChange {
     @Serializable
     @SerialName("update")
-    data class Update(val entryIds: List<String>, val sessionMs: Long, val restMs: Long) : PendingChange
+    data class Update(
+        val entryIds: List<String>,
+        val sessionMs: Long,
+        val restMs: Long,
+        val excludeDomains: List<String> = emptyList(),
+    ) : PendingChange
 
     @Serializable
     @SerialName("delete")
@@ -103,6 +108,8 @@ data class Target(
     val restMs: Long,
     /** A loosening change made while the target was resting. It applies when the rest ends. */
     val pending: PendingChange?,
+    /** Subdomains of the target's sites that don't count. Android only matches apps, so it just carries them. */
+    val excludeDomains: List<String> = emptyList(),
 ) {
     val limits get() = Limits(sessionMs, restMs)
 }
@@ -117,6 +124,7 @@ data class TargetEdit(
     val entryIds: List<String>,
     val sessionMs: Long,
     val restMs: Long,
+    val excludeDomains: List<String> = emptyList(),
 )
 
 @Serializable
@@ -134,6 +142,7 @@ fun effectiveConfig(config: Config, isResting: (String) -> Boolean): Config =
                 entryIds = pending.entryIds,
                 sessionMs = pending.sessionMs,
                 restMs = pending.restMs,
+                excludeDomains = pending.excludeDomains,
                 pending = null,
             )
             else -> null
@@ -158,14 +167,17 @@ fun applyEdit(current: Config, edit: ConfigEdit, isResting: (String) -> Boolean)
         val sessionMs = minOf(old.sessionMs, next.sessionMs)
         val restMs = maxOf(old.restMs, next.restMs)
         val entryIds = (old.entryIds + next.entryIds).distinct()
-        val loosens = sessionMs != next.sessionMs || restMs != next.restMs || entryIds.size != next.entryIds.size
+        val excludeDomains = next.excludeDomains.filter { it in old.excludeDomains }
+        val loosens = sessionMs != next.sessionMs || restMs != next.restMs || entryIds.size != next.entryIds.size ||
+            excludeDomains.size != next.excludeDomains.size
         targets += Target(
             next.id,
             next.name,
             entryIds,
             sessionMs,
             restMs,
-            if (loosens) PendingChange.Update(next.entryIds, next.sessionMs, next.restMs) else null,
+            if (loosens) PendingChange.Update(next.entryIds, next.sessionMs, next.restMs, next.excludeDomains) else null,
+            excludeDomains,
         )
     }
 
@@ -176,7 +188,9 @@ fun applyEdit(current: Config, edit: ConfigEdit, isResting: (String) -> Boolean)
     return Config(current.version + 1, targets, edit.customEntries)
 }
 
-fun TargetEdit.toTarget(pending: PendingChange?) = Target(id, name, entryIds, sessionMs, restMs, pending)
+fun TargetEdit.toTarget(pending: PendingChange?) = Target(id, name, entryIds, sessionMs, restMs, pending, excludeDomains)
+
+fun Target.toEdit() = TargetEdit(id, name, entryIds, sessionMs, restMs, excludeDomains)
 
 fun targetsForPackage(config: Config, catalog: List<Entry>, pkg: String): List<Target> {
     val matched = (catalog + config.customEntries).filter { pkg in it.packages }.map { it.id }.toSet()
@@ -187,7 +201,7 @@ fun targetsForPackage(config: Config, catalog: List<Entry>, pkg: String): List<T
 fun desiredEdit(config: Config): ConfigEdit {
     val effective = effectiveConfig(config) { false }
     return ConfigEdit(
-        effective.targets.map { TargetEdit(it.id, it.name, it.entryIds, it.sessionMs, it.restMs) },
+        effective.targets.map { it.toEdit() },
         effective.customEntries,
     )
 }

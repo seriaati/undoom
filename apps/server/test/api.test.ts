@@ -139,12 +139,16 @@ describe("sync", () => {
     const loose = await call("/api/sync/config", {
       token,
       method: "PUT",
-      body: { targets: [{ ...reddit, sessionMs: 30 * MIN, restMs: 90 * MIN }], customEntries: [] },
+      body: {
+        targets: [{ ...reddit, sessionMs: 30 * MIN, restMs: 90 * MIN, excludeDomains: ["old.reddit.com"] }],
+        customEntries: [],
+      },
     });
     expect(loose.body.config.targets[0]).toMatchObject({
       sessionMs: 5 * MIN,
       restMs: 90 * MIN,
-      pending: { kind: "update", sessionMs: 30 * MIN },
+      excludeDomains: [],
+      pending: { kind: "update", sessionMs: 30 * MIN, excludeDomains: ["old.reddit.com"] },
     });
 
     // An emergency unlock ends the rest, so the pending change applies.
@@ -152,7 +156,11 @@ describe("sync", () => {
       token,
       body: { events: [{ kind: "unlock", eventId: "pc:2", targetId: "t1", at: Date.now() }] },
     });
-    expect(unlocked.body.config.targets[0]).toMatchObject({ sessionMs: 30 * MIN, pending: null });
+    expect(unlocked.body.config.targets[0]).toMatchObject({
+      sessionMs: 30 * MIN,
+      excludeDomains: ["old.reddit.com"],
+      pending: null,
+    });
   });
 
   test("invalid config is rejected", async () => {

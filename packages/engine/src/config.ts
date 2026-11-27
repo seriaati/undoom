@@ -11,6 +11,8 @@ export interface TargetSettings {
   entryIds: string[];
   sessionMs: number;
   restMs: number;
+  /** Subdomains of the target's sites that don't count. Missing in configs saved before exclusions existed. */
+  excludeDomains?: string[];
 }
 
 export type PendingChange = ({ kind: "update" } & TargetSettings) | { kind: "delete" };
@@ -74,21 +76,30 @@ export function applyEdit(
       targets.push({ ...next, pending: null });
       continue;
     }
-    const strict: TargetSettings = {
+    const nextExcludes = next.excludeDomains ?? [];
+    const strict = {
       sessionMs: Math.min(old.sessionMs, next.sessionMs),
       restMs: Math.max(old.restMs, next.restMs),
       entryIds: [...new Set([...old.entryIds, ...next.entryIds])],
+      excludeDomains: nextExcludes.filter((d) => old.excludeDomains?.includes(d)),
     };
     const loosens =
       strict.sessionMs !== next.sessionMs ||
       strict.restMs !== next.restMs ||
-      strict.entryIds.length !== next.entryIds.length;
+      strict.entryIds.length !== next.entryIds.length ||
+      strict.excludeDomains.length !== nextExcludes.length;
     targets.push({
       id: next.id,
       name: next.name,
       ...strict,
       pending: loosens
-        ? { kind: "update", sessionMs: next.sessionMs, restMs: next.restMs, entryIds: next.entryIds }
+        ? {
+            kind: "update",
+            sessionMs: next.sessionMs,
+            restMs: next.restMs,
+            entryIds: next.entryIds,
+            excludeDomains: nextExcludes,
+          }
         : null,
     });
   }
@@ -122,7 +133,7 @@ export function targetsForHost(config: Config, catalog: readonly Entry[], host: 
     config,
     catalog,
     (e) => e.domains.some((d) => hostMatches(h, d)) && !excluded(e.excludeDomains),
-  );
+  ).filter((t) => !excluded(t.excludeDomains));
 }
 
 export function targetsForPackage(config: Config, catalog: readonly Entry[], pkg: string): Target[] {

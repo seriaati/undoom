@@ -64,6 +64,17 @@ class ConfigTest {
         assertNull(undone.targets[0].pending)
     }
 
+    @Test
+    fun defersNewExclusionsOfARestingTargetAndDropsRemovedOnesNow() {
+        val start = applyEdit(base, edit(reddit.copy(excludeDomains = listOf("a.reddit.com", "b.reddit.com"))), notResting)
+        val next = applyEdit(start, edit(reddit.copy(excludeDomains = listOf("a.reddit.com", "c.reddit.com"))), resting)
+        assertEquals(listOf("a.reddit.com"), next.targets[0].excludeDomains)
+        assertEquals(listOf("a.reddit.com", "c.reddit.com"), (next.targets[0].pending as PendingChange.Update).excludeDomains)
+        val removed = applyEdit(start, edit(reddit), resting)
+        assertEquals(emptyList<String>(), removed.targets[0].excludeDomains)
+        assertNull(removed.targets[0].pending)
+    }
+
     private val pendingConfig = applyEdit(base, edit(reddit.copy(sessionMs = 30 * MIN)), resting)
 
     @Test
@@ -101,7 +112,7 @@ class ConfigTest {
         val config = applyEdit(base, edit(), resting)
         val encoded = json.encodeToString(Config.serializer(), config)
         assertEquals(
-            """{"version":2,"targets":[{"id":"t1","name":null,"entryIds":["reddit"],"sessionMs":300000,"restMs":3600000,"pending":{"kind":"delete"}}],"customEntries":[]}""",
+            """{"version":2,"targets":[{"id":"t1","name":null,"entryIds":["reddit"],"sessionMs":300000,"restMs":3600000,"pending":{"kind":"delete"},"excludeDomains":[]}],"customEntries":[]}""",
             encoded,
         )
         assertEquals(config, json.decodeFromString(Config.serializer(), encoded))

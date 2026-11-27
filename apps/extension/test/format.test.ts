@@ -61,6 +61,11 @@ test("pendingText", () => {
   expect(pendingText({ ...group, pending: { kind: "update", entryIds: ["custom:x"], sessionMs: MIN, restMs: MIN } }, entries)).toBe(
     "Changes apply after the current rest: session 1 min, rest 1 min, removing Reddit.",
   );
+  const excluding = { ...base, excludeDomains: ["a.reddit.com"] };
+  const pending = { kind: "update" as const, entryIds: ["reddit"], sessionMs: MIN, restMs: MIN, excludeDomains: ["a.reddit.com", "b.reddit.com"] };
+  expect(pendingText({ ...excluding, pending }, entries)).toBe(
+    "Changes apply after the current rest: session 1 min, rest 1 min, excluding b.reddit.com.",
+  );
 });
 
 describe("block page URL", () => {

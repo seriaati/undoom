@@ -25,6 +25,7 @@ import {
 import { send, useView } from "@/lib/client";
 import {
   entryForDomain,
+  isSubdomainOf,
   limitsError,
   normalizeDomain,
   removeTarget,
@@ -83,6 +84,8 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
   const [name, setName] = useState(desired?.name ?? "");
   const [session, setSession] = useState((desired?.sessionMs ?? 15 * MINUTE) / MINUTE);
   const [rest, setRest] = useState((desired?.restMs ?? 60 * MINUTE) / MINUTE);
+  const [excludes, setExcludes] = useState(desired?.excludeDomains ?? []);
+  const [excludeQuery, setExcludeQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => dialog.current?.showModal(), []);
@@ -106,11 +109,22 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
     setError(null);
   }
 
-  function onQueryKey(event: KeyboardEvent) {
+  function addExclude() {
+    const text = excludeQuery.trim();
+    if (text === "") return;
+    const domain = normalizeDomain(text);
+    if (domain === null) return setError(`"${text}" isn't a domain.`);
+    if (!isSubdomainOf(chosen, domain)) return setError(`${domain} isn't a subdomain of a site in this limit.`);
+    if (!excludes.includes(domain)) setExcludes([...excludes, domain]);
+    setExcludeQuery("");
+    setError(null);
+  }
+
+  const onEnter = (add: () => void) => (event: KeyboardEvent) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    addSite();
-  }
+    add();
+  };
 
   async function submit(edit: () => ConfigEdit) {
     let next: ConfigEdit;
@@ -143,6 +157,7 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
       entryIds: chosen.map((e) => e.id),
       sessionMs: session * MINUTE,
       restMs: rest * MINUTE,
+      excludeDomains: excludes,
     };
     void submit(() => saveTarget(view.desired, edit, chosen, view.config, isResting));
   }
@@ -185,7 +200,7 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
               aria-label="Site name or domain"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onQueryKey}
+              onKeyDown={onEnter(addSite)}
             />
             <datalist id="catalog-sites">
               {available.map((e) => (
@@ -206,6 +221,34 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
             <p className="hint">These sites share one session and one rest.</p>
           </div>
         )}
+        <fieldset>
+          <legend className="label">Excluded sites</legend>
+          {excludes.length > 0 && (
+            <div className="chips">
+              {excludes.map((d) => (
+                <span key={d} className="chip">
+                  {d}
+                  <button type="button" aria-label={`Stop excluding ${d}`} onClick={() => setExcludes(excludes.filter((x) => x !== d))}>
+                    <CloseIcon />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="add-site">
+            <input
+              placeholder="e.g. music.youtube.com"
+              aria-label="Subdomain to exclude"
+              value={excludeQuery}
+              onChange={(e) => setExcludeQuery(e.target.value)}
+              onKeyDown={onEnter(addExclude)}
+            />
+            <button type="button" className="outline icon-only" aria-label="Add exclusion" title="Add exclusion" onClick={addExclude}>
+              <PlusIcon />
+            </button>
+          </div>
+          <p className="hint">Subdomains that belong to a different service and shouldn't count.</p>
+        </fieldset>
         <DurationField label="Session" presets={SESSION_PRESETS} minutes={session} onChange={setSession} />
         <DurationField label="Rest" presets={REST_PRESETS} minutes={rest} onChange={setRest} />
         {error && <p className="error">{error}</p>}

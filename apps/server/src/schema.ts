@@ -23,6 +23,7 @@ export const targetEditSchema = z.object({
   entryIds: z.array(id).min(1).max(100),
   sessionMs: z.number().int().min(MINUTE).max(DAY),
   restMs: z.number().int().min(MINUTE).max(7 * DAY),
+  excludeDomains: z.array(domain).max(50).optional(),
 });
 
 export const configEditSchema = z.object({

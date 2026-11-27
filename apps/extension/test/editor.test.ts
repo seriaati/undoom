@@ -4,6 +4,7 @@ import {
   addEntries,
   addTarget,
   entryForDomain,
+  isSubdomainOf,
   limitsError,
   normalizeDomain,
   removeEntry,
@@ -17,6 +18,13 @@ const catalog: Entry[] = [{ id: "reddit", name: "Reddit", domains: ["reddit.com"
 const custom: Entry = { id: "custom:a", name: "news.example", domains: ["news.example"], packages: [] };
 const target = (id: string, entryIds: string[]) => ({ id, name: null, entryIds, sessionMs: 5 * MIN, restMs: 60 * MIN });
 const empty: ConfigEdit = { targets: [], customEntries: [] };
+
+test("isSubdomainOf only accepts strict subdomains of the entries' sites", () => {
+  expect(isSubdomainOf(catalog, "old.reddit.com")).toBe(true);
+  expect(isSubdomainOf(catalog, "reddit.com")).toBe(false);
+  expect(isSubdomainOf(catalog, "notreddit.com")).toBe(false);
+  expect(isSubdomainOf(catalog, "news.example")).toBe(false);
+});
 
 describe("normalizeDomain", () => {
   test.each([

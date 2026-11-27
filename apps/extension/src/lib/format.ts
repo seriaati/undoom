@@ -68,5 +68,7 @@ export function pendingText(target: Target, entries: readonly Entry[]): string |
     .filter((id) => !pending.entryIds.includes(id))
     .map((id) => entries.find((e) => e.id === id)?.name ?? id);
   const sites = removed.length > 0 ? `, removing ${removed.join(", ")}` : "";
-  return `Changes apply after the current rest: session ${formatMinutes(pending.sessionMs)}, rest ${formatMinutes(pending.restMs)}${sites}.`;
+  const added = (pending.excludeDomains ?? []).filter((d) => !target.excludeDomains?.includes(d));
+  const excludes = added.length > 0 ? `, excluding ${added.join(", ")}` : "";
+  return `Changes apply after the current rest: session ${formatMinutes(pending.sessionMs)}, rest ${formatMinutes(pending.restMs)}${sites}${excludes}.`;
 }

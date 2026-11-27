@@ -26,6 +26,11 @@ export function normalizeDomain(input: string): string | null {
   return /^(?=.*[a-z])[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : null;
 }
 
+/** Excluding a site's own domain would switch the limit off, so only strict subdomains qualify. */
+export function isSubdomainOf(entries: readonly Entry[], domain: string): boolean {
+  return entries.some((e) => e.domains.some((d) => domain.endsWith(`.${d}`)));
+}
+
 /** The catalog or custom entry for a domain, or a new custom entry. */
 export function entryForDomain(
   catalog: readonly Entry[],

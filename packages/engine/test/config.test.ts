@@ -51,6 +51,20 @@ describe("applyEdit", () => {
     });
   });
 
+  test("defers new exclusions of a resting target and drops removed ones now", () => {
+    const excluded = { ...reddit, excludeDomains: ["a.reddit.com", "b.reddit.com"] };
+    const start = applyEdit(base, edit([excluded]), notResting);
+    const next = applyEdit(start, edit([{ ...reddit, excludeDomains: ["a.reddit.com", "c.reddit.com"] }]), resting);
+    expect(next.targets[0]).toMatchObject({
+      excludeDomains: ["a.reddit.com"],
+      pending: { kind: "update", excludeDomains: ["a.reddit.com", "c.reddit.com"] },
+    });
+    expect(applyEdit(start, edit([{ ...reddit, excludeDomains: [] }]), resting).targets[0]).toMatchObject({
+      excludeDomains: [],
+      pending: null,
+    });
+  });
+
   test("defers deleting a resting target", () => {
     const next = applyEdit(base, edit([]), resting);
     expect(next.targets[0]).toMatchObject({ id: "t1", pending: { kind: "delete" } });
@@ -112,6 +126,12 @@ describe("matching", () => {
     const config: Config = { ...base, targets: [{ ...reddit, id: "yt", entryIds: ["youtube"], pending: null }] };
     expect(targetsForHost(config, catalog, "music.youtube.com")).toEqual([]);
     expect(targetsForHost(config, catalog, "m.youtube.com").map((t) => t.id)).toEqual(["yt"]);
+  });
+
+  test("skips a target's excluded subdomains", () => {
+    const excluding: Config = { ...base, targets: [{ ...reddit, excludeDomains: ["old.reddit.com"], pending: null }] };
+    expect(targetsForHost(excluding, catalog, "old.reddit.com")).toEqual([]);
+    expect(targetsForHost(excluding, catalog, "www.reddit.com").map((t) => t.id)).toEqual(["t1"]);
   });
 
   test("matches Android packages", () => {
