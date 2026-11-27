@@ -4,30 +4,44 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sign in · Undoom</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="/style.css">
   <script src="/signin/signin.js" defer></script>
 </head>
 <body>
   <main>
+    <a class="brand" href="/"><img class="logo" src="/favicon.svg" alt="">Undoom</a>
     <section id="signin">
-      <h1>Undoom</h1>
-      <p id="purpose">Sign in with your passkey.</p>
-      <button id="login">Sign in with a passkey</button>
-      <hr>
-      <label for="name">New here? Name your account</label>
-      <input id="name" maxlength="64" placeholder="e.g. Seria" autocomplete="nickname">
-      <button id="register" class="secondary">Create an account</button>
+      <div class="tabs" role="tablist">
+        <button id="tab-login" role="tab" aria-selected="true" aria-controls="panel-login">Sign in</button>
+        <button id="tab-register" role="tab" aria-selected="false" aria-controls="panel-register">Create account</button>
+      </div>
+      <div id="panel-login" class="panel" role="tabpanel" aria-labelledby="tab-login">
+        <p id="purpose">Use the passkey saved on this device or in your password manager.</p>
+        <button id="login" class="primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.9 12.1 20 3M16 7l3 3M13.5 9.5l2 2"/></svg>
+          Sign in with a passkey
+        </button>
+      </div>
+      <div id="panel-register" class="panel" role="tabpanel" aria-labelledby="tab-register" hidden>
+        <p>Create a passkey for a new account. Your limits sync to every device you sign in on.</p>
+        <label for="name">Account name <span>(optional)</span></label>
+        <input id="name" maxlength="64" placeholder="e.g. Seria" autocomplete="nickname">
+        <button id="register" class="primary">Create account</button>
+      </div>
+      <p class="note">No password to remember. Your passkey stays on your device.</p>
     </section>
     <section id="add" hidden>
       <h1>Add a passkey</h1>
-      <p>Create another passkey for your Undoom account, for example on a new device or password manager.</p>
-      <button id="add-button">Add a passkey</button>
+      <p>Create another passkey for your Undoom account, for example on a new device or in a password manager.</p>
+      <button id="add-button" class="primary">Add a passkey</button>
     </section>
     <section id="done" hidden>
       <h1>Done</h1>
       <p id="done-text">You're signed in. You can close this page.</p>
     </section>
-    <p id="error" class="error" hidden></p>
+    <p id="error" class="error" role="alert" hidden></p>
   </main>
 </body>
 </html>

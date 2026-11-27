@@ -74,6 +74,15 @@ if (redirectUri !== null && !EXTENSION_REDIRECT.test(redirectUri)) {
 } else {
   if (redirectUri !== null) $("purpose").textContent = "Sign in to connect the Undoom extension.";
 
+  for (const tab of ["login", "register"]) {
+    $(`tab-${tab}`).addEventListener("click", () => {
+      for (const other of ["login", "register"]) {
+        $(`tab-${other}`).setAttribute("aria-selected", String(other === tab));
+        $(`panel-${other}`).hidden = other !== tab;
+      }
+    });
+  }
+
   $("login").addEventListener("click", () =>
     run($("login"), async () => {
       const { flowId, options } = await post("/api/auth/login/options", {});
