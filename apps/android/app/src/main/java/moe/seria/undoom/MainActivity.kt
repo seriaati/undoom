@@ -11,32 +11,55 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,8 +73,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import java.util.UUID
@@ -115,28 +146,53 @@ private suspend fun attempt(error: (String?) -> Unit, block: suspend () -> Unit)
 @Composable
 private fun SignInScreen(activity: MainActivity) {
     val scope = rememberCoroutineScope()
+    var creating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var pasted by remember { mutableStateOf("") }
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("Undoom", style = MaterialTheme.typography.displayMedium)
-        Text("Keep scrolling. Just not forever.", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(48.dp))
-        Button(onClick = { scope.launch { attempt({ error = it }) { Repo.signIn(signInWithPasskey(activity)) } } }) {
-            Text("Sign in with a passkey")
+    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Logo(40.dp)
+            Text("Undoom", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         }
-        OutlinedButton(onClick = { scope.launch { attempt({ error = it }) { Repo.signIn(registerWithPasskey(activity)) } } }) {
-            Text("Create an account")
+        Spacer(Modifier.height(24.dp))
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            listOf("Sign in", "Create account").forEachIndexed { index, label ->
+                SegmentedButton(
+                    selected = creating == (index == 1),
+                    onClick = {
+                        creating = index == 1
+                        error = null
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index, 2),
+                ) { Text(label) }
+            }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            if (creating) "Your account is tied to a passkey. There's no password to remember." else "Use the passkey saved on this device or in your password manager.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { scope.launch { attempt({ error = it }) { Repo.signIn(if (creating) registerWithPasskey(activity) else signInWithPasskey(activity)) } } },
+            Modifier.fillMaxWidth(),
+        ) { Text(if (creating) "Create account" else "Sign in with a passkey") }
+        error?.let {
+            Spacer(Modifier.height(16.dp))
+            Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        }
+        Spacer(Modifier.weight(1f))
         // Passkeys can't work against a local server: the RP ID has to match the assetlinks domain.
         if (BuildConfig.DEBUG) {
-            Spacer(Modifier.height(32.dp))
-            OutlinedTextField(pasted, { pasted = it.trim() }, label = { Text("Debug: paste a token") }, singleLine = true)
-            TextButton(onClick = { Repo.signIn(pasted) }, enabled = pasted.isNotEmpty()) { Text("Use token") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    pasted, { pasted = it.trim() }, Modifier.weight(1f),
+                    placeholder = { Text("Debug token", style = MaterialTheme.typography.bodySmall) }, singleLine = true, textStyle = MaterialTheme.typography.bodySmall,
+                )
+                TextButton(onClick = { Repo.signIn(pasted) }, enabled = pasted.isNotEmpty()) { Text("Use") }
+            }
         }
     }
 }
@@ -147,100 +203,240 @@ private fun serviceEnabled(context: Context): Boolean {
     return enabled.split(':').any { ComponentName.unflattenFromString(it) == me }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TargetsScreen(activity: MainActivity, resumes: Int, saved: Saved, open: (Screen) -> Unit) {
     val now = rememberNow()
     val enabled = remember(resumes) { serviceEnabled(activity) }
+    val targets = Repo.effective(saved, now).targets
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Undoom") },
-                actions = { TextButton(onClick = { open(Screen.Account) }) { Text("Account") } },
-            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Undoom", Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em)
+                OutlinedIconButton(
+                    onClick = { open(Screen.Account) },
+                    colors = IconButtonDefaults.outlinedIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Icon(painterResource(R.drawable.ic_person), contentDescription = "Account")
+                }
+            }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { open(Screen.Edit(null)) }) { Text("+", style = MaterialTheme.typography.headlineSmall) }
+            ExtendedFloatingActionButton(
+                text = { Text("Add limit") },
+                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                onClick = { open(Screen.Edit(null)) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            )
         },
     ) { padding ->
-        LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+        LazyColumn(
+            Modifier.padding(padding).fillMaxSize(),
+            // The bottom padding keeps the last card scrollable out from under the FAB.
+            contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             if (!enabled) item { Onboarding(activity) }
-            val targets = Repo.effective(saved, now).targets
-            if (targets.isEmpty()) {
-                item { Text("Nothing tracked yet. Tap + to add an app.", Modifier.padding(16.dp)) }
-            }
+            if (targets.isEmpty()) item { EmptyState() }
             items(targets, key = { it.id }) { target ->
-                val status = status(Repo.localState(target, saved), target.limits, now)
-                Column(
-                    Modifier.fillMaxWidth()
-                        .clickable(enabled = target.pending != PendingChange.Delete) { open(Screen.Edit(target.id)) }
-                        .padding(16.dp),
-                ) {
-                    Text(displayName(target, saved), style = MaterialTheme.typography.titleMedium)
-                    val limits = "${target.sessionMs / MINUTE} min sessions, ${target.restMs / MINUTE} min rest"
-                    val state = if (status.restUntil != null) {
-                        "Resting, ${formatDuration(status.restUntil - now)} left"
-                    } else {
-                        "${formatDuration(status.remainingMs)} left in this session"
-                    }
-                    Text(state, color = if (status.blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                    Text(limits, style = MaterialTheme.typography.bodySmall)
-                    when (target.pending) {
-                        PendingChange.Delete -> Text("Will be removed after the current rest", style = MaterialTheme.typography.bodySmall)
-                        is PendingChange.Update -> Text("Changes apply after the current rest", style = MaterialTheme.typography.bodySmall)
-                        null -> {}
-                    }
-                }
-                HorizontalDivider()
+                LimitCard(target, saved, now, onClick = { open(Screen.Edit(target.id)) })
             }
         }
     }
+}
+
+@Composable
+private fun EmptyState() {
+    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("No limits yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Add an app to give it short sessions with a rest in between.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun LimitCard(target: Target, saved: Saved, now: Long, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val name = displayName(target, saved)
+    val status = status(Repo.localState(target, saved), target.limits, now)
+    val restUntil = status.restUntil
+    val ready = restUntil == null && status.remainingMs >= target.sessionMs
+    OutlinedCard(onClick, Modifier.fillMaxWidth(), enabled = target.pending != PendingChange.Delete) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Tile(name)
+                Column(Modifier.weight(1f)) {
+                    Text(name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val sub = if (ready) {
+                        "${formatLimit(target.sessionMs)} · ${formatLimit(target.restMs)} rest"
+                    } else {
+                        target.name?.let { appNames(target.entryIds, saved) }
+                    }
+                    sub?.let { Muted(it, maxLines = 1) }
+                }
+                when {
+                    restUntil != null -> Pill("Resting", colors.errorContainer, colors.error)
+                    ready -> Pill("Ready", colors.background, colors.onSurfaceVariant)
+                    else -> Pill("In session", colors.primaryContainer, colors.primary)
+                }
+            }
+            if (restUntil != null) {
+                Countdown(restUntil - now, "until the next session", colors.error)
+                Bar(1f - (restUntil - now).toFloat() / target.restMs, colors.error)
+                Muted("${formatLimit(target.sessionMs)} sessions")
+            } else if (!ready) {
+                Countdown(status.remainingMs, "left of ${formatLimit(target.sessionMs)}", colors.onSurface)
+                Bar(status.remainingMs.toFloat() / target.sessionMs, colors.primary)
+                Muted("Then ${formatLimit(target.restMs)} rest")
+            }
+            when (target.pending) {
+                PendingChange.Delete -> Muted("Will be removed after the current rest")
+                is PendingChange.Update -> Muted("Changes apply after the current rest")
+                null -> {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun Tile(name: String) {
+    Box(
+        Modifier.size(34.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(name.take(1).uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun Pill(text: String, background: Color, color: Color) {
+    Text(
+        text,
+        Modifier.background(background, CircleShape).padding(horizontal = 8.dp, vertical = 4.dp),
+        color = color,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+@Composable
+private fun Countdown(ms: Long, label: String, color: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            formatDuration(ms),
+            Modifier.alignByBaseline(),
+            color = color,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = (-0.02).em,
+            style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"),
+        )
+        Muted(label, Modifier.alignByBaseline())
+    }
+}
+
+@Composable
+private fun Bar(fraction: Float, color: Color) {
+    Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().clip(CircleShape).background(color))
+    }
+}
+
+@Composable
+private fun Muted(text: String, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE) {
+    Text(
+        text,
+        modifier,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
 private fun Onboarding(activity: MainActivity) {
-    Card(Modifier.padding(16.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Turn on Undoom", style = MaterialTheme.typography.titleMedium)
-            Text("Undoom uses an accessibility service to see which app is open and to close apps that are resting.")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Android blocks this for apps installed from an APK until you allow it. " +
-                        "Open App info, tap ⋮ in the top corner, then \"Allow restricted settings\".",
-                )
-                TextButton(onClick = {
-                    activity.startActivity(
-                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)),
-                    )
-                }) { Text("1. Open App info") }
-            }
-            Text("Then turn on Undoom under Accessibility → Installed apps.")
-            TextButton(onClick = { activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) {
-                Text(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) "2. Open accessibility settings" else "Open accessibility settings")
+    val colors = MaterialTheme.colorScheme
+    val stepColors = ButtonDefaults.buttonColors(containerColor = colors.onPrimary, contentColor = colors.primary)
+    val restricted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    Card(colors = CardDefaults.cardColors(containerColor = colors.primary, contentColor = colors.onPrimary)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Turn on blocking", fontWeight = FontWeight.Bold)
+            Text(
+                if (restricted) {
+                    "Undoom needs accessibility access to close resting apps. First, in App info, tap ⋮ and " +
+                        "allow restricted settings. Then turn Undoom on under Installed apps."
+                } else {
+                    "Undoom needs accessibility access to close resting apps. Turn it on under Installed apps."
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (restricted) {
+                    Button(
+                        onClick = {
+                            activity.startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)),
+                            )
+                        },
+                        colors = stepColors,
+                    ) { Text("1. Open App info") }
+                }
+                Button(onClick = { activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }, colors = stepColors) {
+                    Text(if (restricted) "2. Open accessibility settings" else "Open accessibility settings")
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountScreen(activity: MainActivity, token: String, back: () -> Unit) {
     val scope = rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Account", style = MaterialTheme.typography.headlineMedium)
-        Text("Add a passkey on another device or password manager so you can still sign in if you lose this one.")
-        Button(onClick = {
-            scope.launch {
-                attempt({ message = it }) {
-                    addPasskey(activity, token)
-                    message = "Passkey added"
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Account") },
+                navigationIcon = {
+                    IconButton(onClick = back) { Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "Back") }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
+    ) { padding ->
+        Column(Modifier.padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Signed in with a passkey", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Add a passkey on another device or password manager so you can still sign in if you lose this one.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                attempt({ message = it }) {
+                                    addPasskey(activity, token)
+                                    message = "Passkey added"
+                                }
+                            }
+                        }) { Text("Add a passkey") }
+                        TextButton(onClick = { Repo.signOut() }) { Text("Sign out") }
+                    }
                 }
             }
-        }) { Text("Add a passkey") }
-        OutlinedButton(onClick = { Repo.signOut() }) { Text("Sign out") }
-        message?.let { Text(it) }
-        TextButton(onClick = back) { Text("Back") }
+            message?.let { Text(it, Modifier.padding(horizontal = 16.dp)) }
+        }
     }
 }
 
@@ -264,11 +460,13 @@ private fun candidates(context: Context, known: List<Entry>): List<Candidate> {
         .sortedWith(compareBy({ !it.installed }, { it.entry.name.lowercase() }))
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, done: () -> Unit) {
     val config = saved.snapshot?.config ?: emptyConfig
     val desired = remember(config) { desiredEdit(config) }
     val existing = desired.targets.find { it.id == targetId }
+    val existingName = existing?.let { it.name ?: appNames(it.entryIds, saved) }
     val known = entries(saved)
     val all by produceState(emptyList<Candidate>(), known) {
         value = withContext(Dispatchers.IO) { candidates(activity, known) }
@@ -280,7 +478,7 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
 
     var name by remember { mutableStateOf(existing?.name.orEmpty()) }
     val selected = remember { mutableStateListOf(*existing?.entryIds.orEmpty().toTypedArray()) }
-    var session by remember { mutableStateOf(((existing?.sessionMs ?: (10 * MINUTE)) / MINUTE).toString()) }
+    var session by remember { mutableStateOf(((existing?.sessionMs ?: (15 * MINUTE)) / MINUTE).toString()) }
     var rest by remember { mutableStateOf(((existing?.restMs ?: (60 * MINUTE)) / MINUTE).toString()) }
     var query by remember { mutableStateOf("") }
 
@@ -304,54 +502,131 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
         done()
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        item {
-            Spacer(Modifier.height(24.dp))
-            Text(if (existing == null) "Add" else "Edit", style = MaterialTheme.typography.headlineMedium)
-            if (resting) Text("This is resting. Looser limits apply after the current rest.", color = MaterialTheme.colorScheme.error)
-            OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("Group name (needed for more than one app)") }, singleLine = true)
-            Row {
-                OutlinedTextField(
-                    session, { session = it.filter(Char::isDigit) }, Modifier.weight(1f),
-                    label = { Text("Session (min)") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    rest, { rest = it.filter(Char::isDigit) }, Modifier.weight(1f),
-                    label = { Text("Rest (min)") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-            }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Row {
-                Button(enabled = error == null, onClick = {
-                    val edit = TargetEdit(targetId ?: UUID.randomUUID().toString(), trimmedName, selected.toList(), sessionMin!! * MINUTE, restMin!! * MINUTE)
-                    save(if (existing == null) desired.targets + edit else desired.targets.map { if (it.id == edit.id) edit else it })
-                }) { Text("Save") }
-                if (existing != null) {
-                    TextButton(onClick = { save(desired.targets.filter { it.id != targetId }) }) { Text("Delete") }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(existingName?.let { "Edit $it" } ?: "Add limit", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = {
+                    IconButton(onClick = done) { Icon(painterResource(R.drawable.ic_close), contentDescription = "Close") }
+                },
+                actions = {
+                    if (existing != null) {
+                        TextButton(
+                            onClick = { save(desired.targets.filter { it.id != targetId }) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) { Text("Delete") }
+                    }
+                    Button(
+                        enabled = error == null,
+                        onClick = {
+                            val edit = TargetEdit(targetId ?: UUID.randomUUID().toString(), trimmedName, selected.toList(), sessionMin!! * MINUTE, restMin!! * MINUTE)
+                            save(if (existing == null) desired.targets + edit else desired.targets.map { if (it.id == edit.id) edit else it })
+                        },
+                        modifier = Modifier.padding(end = 8.dp),
+                    ) { Text("Save") }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
+    ) { padding ->
+        LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp)) {
+            item {
+                Column(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (resting) {
+                        Text(
+                            "$existingName is resting. Stricter limits apply right away. Looser ones start when this rest ends.",
+                            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(12.dp)).padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    if (selected.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FieldLabel("Selected")
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                for (id in selected) {
+                                    InputChip(
+                                        selected = false,
+                                        onClick = { selected.remove(id) },
+                                        label = { Text(all.find { it.entry.id == id }?.entry?.name ?: entryName(id, saved)) },
+                                        trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = "Remove", Modifier.size(16.dp)) },
+                                        shape = CircleShape,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    // Also shown for an existing single-app limit that has a name, so the name can still be changed.
+                    if (selected.size > 1 || existing?.name != null) {
+                        OutlinedTextField(
+                            name, { name = it }, Modifier.fillMaxWidth(),
+                            label = { Text("Name") },
+                            placeholder = { Text("e.g. Short videos") },
+                            supportingText = { Text("These apps share one session and one rest.") },
+                            singleLine = true,
+                        )
+                    }
+                    DurationPicker("Session", listOf(5L, 10L, 15L, 30L, 60L), session) { session = it }
+                    DurationPicker("Rest", listOf(30L, 60L, 120L, 240L), rest) { rest = it }
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FieldLabel("Apps")
+                        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("Search apps") }, singleLine = true)
+                    }
                 }
-                TextButton(onClick = done) { Text("Cancel") }
             }
-            OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text("Search apps") }, singleLine = true)
+            val shown = all.filter { it.entry.id !in taken && (query.isBlank() || it.entry.name.contains(query, ignoreCase = true)) }
+                .sortedBy { it.entry.id !in selected }
+            items(shown, key = { it.entry.id }) { (entry, installed) ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { if (!selected.remove(entry.id)) selected += entry.id },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(entry.id in selected, onCheckedChange = null, Modifier.padding(12.dp))
+                    Column {
+                        Text(entry.name)
+                        Muted((if (installed) "" else "Not installed · ") + entry.packages.joinToString())
+                    }
+                }
+            }
         }
-        val shown = all.filter { it.entry.id !in taken && (query.isBlank() || it.entry.name.contains(query, ignoreCase = true)) }
-            .sortedBy { it.entry.id !in selected }
-        items(shown, key = { it.entry.id }) { (entry, installed) ->
-            Row(
-                Modifier.fillMaxWidth().clickable { if (!selected.remove(entry.id)) selected += entry.id },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(entry.id in selected, onCheckedChange = null, Modifier.padding(12.dp))
-                Column {
-                    Text(entry.name)
-                    Text(
-                        (if (installed) "" else "Not installed · ") + entry.packages.joinToString(),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+}
+
+/** [minutes] is the raw field text, so it can be empty or out of range while the user types. */
+@Composable
+private fun DurationPicker(label: String, presets: List<Long>, minutes: String, onChange: (String) -> Unit) {
+    var custom by remember { mutableStateOf(minutes.toLongOrNull() !in presets) }
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FieldLabel(label)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (preset in presets) {
+                FilterChip(
+                    selected = !custom && minutes == preset.toString(),
+                    onClick = {
+                        custom = false
+                        onChange(preset.toString())
+                    },
+                    label = { Text(formatLimit(preset * MINUTE)) },
+                    colors = chipColors,
+                )
             }
+            FilterChip(selected = custom, onClick = { custom = true }, label = { Text("Custom") }, colors = chipColors)
+        }
+        if (custom) {
+            OutlinedTextField(
+                minutes, { onChange(it.filter(Char::isDigit)) }, Modifier.width(160.dp),
+                suffix = { Text("min") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
         }
     }
 }
