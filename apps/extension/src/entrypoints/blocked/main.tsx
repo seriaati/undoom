@@ -2,9 +2,10 @@ import catalog from "@undoom/catalog";
 import { type FormEvent, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "@/assets/style.css";
+import { Brand, Countdown } from "@/components/ui";
 import { parseBlockPage } from "@/lib/block";
 import { send, useView } from "@/lib/client";
-import { formatCountdown, targetName } from "@/lib/format";
+import { limitTimer, targetName } from "@/lib/format";
 import { isCorrect, newQuestion } from "@/lib/question";
 
 const { targetId, url } = parseBlockPage(location.search);
@@ -26,13 +27,15 @@ function Unlock({ onUnlock }: { onUnlock: () => void }) {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form className="unlock" onSubmit={submit}>
       <h2>Emergency unlock</h2>
       <p className="muted">This ends the rest and starts a new session.</p>
-      <div className="row">
+      <div className="unlock-row">
         <label htmlFor="answer">{question.text} =</label>
         <input id="answer" inputMode="numeric" autoComplete="off" value={answer} onChange={(e) => setAnswer(e.target.value)} />
-        <button type="submit">Unlock</button>
+        <button type="submit" className="primary">
+          Unlock
+        </button>
       </div>
       {wrong && <p className="error">Not quite. Try this one.</p>}
     </form>
@@ -47,30 +50,33 @@ function Blocked() {
   const target = view.config.targets.find((t) => t.id === targetId);
   const status = view.statuses[targetId];
   const name = target ? targetName(target, [...catalog, ...view.config.customEntries]) : "This site";
-  const goBack = url && <a href={url}>Go back to {new URL(url).hostname}</a>;
 
-  if (status?.blocked && status.restUntil !== null) {
+  if (target && status?.blocked && status.restUntil !== null) {
     return (
-      <>
-        <h1>{name} is resting</h1>
-        <p>
-          Back in <strong>{formatCountdown(status.restUntil - view.now)}</strong>.
-        </p>
-        {unlocking ? (
-          <Unlock onUnlock={refresh} />
-        ) : (
-          <button className="secondary" onClick={() => setUnlocking(true)}>
-            I need it now
-          </button>
-        )}
-      </>
+      <main className="center">
+        <div className="panel">
+          <Brand />
+          <h1>{name} is resting</h1>
+          <Countdown timer={limitTimer(status, target, view.now)} />
+          {unlocking ? (
+            <Unlock onUnlock={refresh} />
+          ) : (
+            <button className="muted inline" onClick={() => setUnlocking(true)}>
+              I need it now
+            </button>
+          )}
+        </div>
+      </main>
     );
   }
   return (
-    <>
-      <h1>{name} is open again</h1>
-      <p>{goBack}</p>
-    </>
+    <main className="center">
+      <div className="panel">
+        <Brand />
+        <h1>{name} is open again</h1>
+        {url && <a href={url}>Go back to {new URL(url).hostname}</a>}
+      </div>
+    </main>
   );
 }
 

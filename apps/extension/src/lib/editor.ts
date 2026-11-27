@@ -119,3 +119,20 @@ export function removeEntry(
   });
   return pruneCustomEntries(targets, edit.customEntries, current, isResting);
 }
+
+/** The editor's save: adds a new target, or brings an existing one's sites, name and limits in line with `target`. */
+export function saveTarget(
+  edit: ConfigEdit,
+  target: TargetEdit,
+  entries: readonly Entry[],
+  current: Config,
+  isResting: (targetId: string) => boolean,
+): ConfigEdit {
+  const old = edit.targets.find((t) => t.id === target.id);
+  if (old === undefined) return addTarget(edit, target, entries);
+  let next = addEntries(edit, target.id, entries);
+  for (const id of old.entryIds) {
+    if (!target.entryIds.includes(id)) next = removeEntry(next, target.id, id, current, isResting);
+  }
+  return { ...next, targets: next.targets.map((t) => (t.id === target.id ? target : t)) };
+}

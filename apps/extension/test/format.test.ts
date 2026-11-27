@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseBlockPage, blockPageUrl } from "../src/lib/block.ts";
-import { formatCountdown, formatMinutes, pendingText, statusText, targetName } from "../src/lib/format.ts";
+import { formatCountdown, formatMinutes, limitTimer, pendingText, targetName } from "../src/lib/format.ts";
 import { isCorrect, newQuestion } from "../src/lib/question.ts";
 
 const MIN = 60_000;
@@ -19,9 +19,27 @@ test("formatMinutes", () => {
   expect(formatMinutes(90 * MIN)).toBe("1 h 30 min");
 });
 
-test("statusText", () => {
-  expect(statusText({ blocked: false, restUntil: null, remainingMs: 4 * MIN }, 0)).toBe("4:00 left in this session");
-  expect(statusText({ blocked: true, restUntil: 10 * MIN, remainingMs: 0 }, 5 * MIN)).toBe("Resting, 5:00 left");
+describe("limitTimer", () => {
+  const limits = { sessionMs: 15 * MIN, restMs: 60 * MIN };
+
+  test("resting counts down to the next session and fills as the rest passes", () => {
+    const timer = limitTimer({ blocked: true, restUntil: 45 * MIN, remainingMs: 0 }, limits, 0);
+    expect(timer).toEqual({ phase: "resting", ms: 45 * MIN, label: "until the next session", progress: 0.25 });
+  });
+
+  test("in session drains with the time left", () => {
+    const timer = limitTimer({ blocked: false, restUntil: null, remainingMs: 6 * MIN }, limits, 0);
+    expect(timer).toEqual({ phase: "session", ms: 6 * MIN, label: "left of 15 min", progress: 0.4 });
+  });
+
+  test("ready shows a whole session", () => {
+    const timer = limitTimer({ blocked: false, restUntil: null, remainingMs: 15 * MIN }, limits, 0);
+    expect(timer).toEqual({ phase: "ready", ms: 15 * MIN, label: "per session", progress: 1 });
+  });
+
+  test("a rest longer than the current setting keeps the bar empty", () => {
+    expect(limitTimer({ blocked: true, restUntil: 90 * MIN, remainingMs: 0 }, limits, 0).progress).toBe(0);
+  });
 });
 
 test("targetName uses the group name or the entry's name", () => {

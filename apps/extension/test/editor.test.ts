@@ -8,6 +8,7 @@ import {
   normalizeDomain,
   removeEntry,
   removeTarget,
+  saveTarget,
   setLimits,
 } from "../src/lib/editor.ts";
 
@@ -117,5 +118,36 @@ describe("group sites", () => {
 
   test("removeEntry won't empty a group", () => {
     expect(() => removeEntry(edit, "g1", "reddit", current, () => false)).toThrow(/at least one site/);
+  });
+});
+
+describe("saveTarget", () => {
+  const youtube: Entry = { id: "youtube", name: "YouTube", domains: ["youtube.com"], packages: [] };
+  const edit: ConfigEdit = { targets: [target("t1", ["reddit", "custom:a"]), target("t2", ["youtube"])], customEntries: [custom] };
+  const current: Config = { version: 1, targets: edit.targets.map((t) => ({ ...t, pending: null })), customEntries: [custom] };
+
+  test("adds a new target like addTarget", () => {
+    const fresh = { ...target("t3", ["custom:b"]), name: null };
+    const entry = { ...custom, id: "custom:b" };
+    expect(saveTarget(edit, fresh, [entry], current, () => false)).toEqual(addTarget(edit, fresh, [entry]));
+  });
+
+  test("updates sites, name and limits, dropping custom entries nothing uses", () => {
+    const other: Entry = { id: "custom:b", name: "b.example", domains: ["b.example"], packages: [] };
+    const next = { id: "t1", name: "Feeds", entryIds: ["reddit", "custom:b"], sessionMs: 10 * MIN, restMs: 2 * 60 * MIN };
+    expect(saveTarget(edit, next, [catalog[0]!, other], current, () => false)).toEqual({
+      targets: [next, edit.targets[1]],
+      customEntries: [other],
+    });
+  });
+
+  test("keeps a removed custom entry while the target rests", () => {
+    const next = { ...target("t1", ["reddit"]), sessionMs: 10 * MIN };
+    expect(saveTarget(edit, next, catalog, current, (id) => id === "t1").customEntries).toEqual([custom]);
+  });
+
+  test("refuses a site that has limits elsewhere", () => {
+    const next = target("t1", ["reddit", "custom:a", "youtube"]);
+    expect(() => saveTarget(edit, next, [catalog[0]!, custom, youtube], current, () => false)).toThrow("YouTube already has limits.");
   });
 });

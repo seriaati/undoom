@@ -1,245 +1,255 @@
 import catalog from "@undoom/catalog";
 import type { ConfigEdit, Entry, Target } from "@undoom/engine";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "@/assets/style.css";
+import { Brand, CloseIcon, Countdown, EditIcon, KeyIcon, Logo, Pill, PlusIcon, Tile } from "@/components/ui";
 import { send, useView } from "@/lib/client";
 import {
-  addEntries,
-  addTarget,
   entryForDomain,
   limitsError,
   normalizeDomain,
-  removeEntry,
   removeTarget,
-  setLimits,
+  saveTarget,
   usedEntryIds,
 } from "@/lib/editor";
-import { formatMinutes, MINUTE, pendingText, statusText, targetName } from "@/lib/format";
+import { formatMinutes, limitTimer, MINUTE, pendingText, targetName } from "@/lib/format";
 import type { Request, View } from "@/lib/messages";
 
-type Save = (edit: ConfigEdit) => void;
+const SESSION_PRESETS = [5, 10, 15, 30, 60];
+const REST_PRESETS = [30, 60, 120, 240];
 
-/** Catalog picks plus typed domains ("a.com, b.org"), deduplicated. Throws on a bad domain. */
-function pickedEntries(desired: ConfigEdit, picked: string[], domains: string): Entry[] {
-  const typed = domains.split(/[\s,]+/).filter(Boolean);
-  const entries = [
-    ...catalog.filter((e) => picked.includes(e.id)),
-    ...typed.map((text) => {
-      const domain = normalizeDomain(text);
-      if (domain === null) throw new Error(`"${text}" isn't a domain.`);
-      return entryForDomain(catalog, desired, domain, () => crypto.randomUUID());
-    }),
-  ];
-  const unique = [...new Map(entries.map((e) => [e.id, e])).values()];
-  if (unique.length === 0) throw new Error("Pick a site or type a domain.");
-  return unique;
-}
-
-function GroupSites({ view, targetId, entries, edit }: { view: View; targetId: string; entries: Entry[]; edit: (change: () => ConfigEdit) => void }) {
-  const [picked, setPicked] = useState("");
-  const [domain, setDomain] = useState("");
-  const desired = view.desired.targets.find((t) => t.id === targetId);
-  if (desired === undefined) return null;
-  const used = usedEntryIds(view.desired);
-  const resting = (id: string) => view.statuses[id]?.blocked ?? false;
-
-  function add(event: FormEvent) {
-    event.preventDefault();
-    edit(() => addEntries(view.desired, targetId, pickedEntries(view.desired, picked === "" ? [] : [picked], domain)));
-    setPicked("");
-    setDomain("");
-  }
-
+function DurationField(props: { label: string; presets: number[]; minutes: number; onChange: (minutes: number) => void }) {
+  const [custom, setCustom] = useState(!props.presets.includes(props.minutes));
   return (
-    <>
-      <div className="row">
-        {desired.entryIds.map((id) => (
-          <span key={id}>
-            {entries.find((e) => e.id === id)?.name ?? id}{" "}
-            <button
-              type="button"
-              className="secondary"
-              title="Remove from the group"
-              onClick={() => edit(() => removeEntry(view.desired, targetId, id, view.config, resting))}
-            >
-              ×
-            </button>
-          </span>
+    <fieldset>
+      <legend className="label">{props.label}</legend>
+      <div className="presets">
+        {props.presets.map((p) => (
+          <button
+            key={p}
+            type="button"
+            aria-pressed={!custom && props.minutes === p}
+            onClick={() => (setCustom(false), props.onChange(p))}
+          >
+            {formatMinutes(p * MINUTE)}
+          </button>
         ))}
-      </div>
-      <form className="row" onSubmit={add}>
-        <select value={picked} onChange={(e) => setPicked(e.target.value)}>
-          <option value="">Add a site…</option>
-          {catalog
-            .filter((e) => !used.has(e.id))
-            .map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-        </select>
-        <input placeholder="or a domain" value={domain} onChange={(e) => setDomain(e.target.value)} />
-        <button type="submit" className="secondary">
-          Add to group
+        <button type="button" className="custom" aria-pressed={custom} onClick={() => setCustom(true)}>
+          Custom
         </button>
-      </form>
-    </>
+      </div>
+      {custom && (
+        <label className="minutes">
+          <input
+            type="number"
+            min={1}
+            aria-label={`${props.label} in minutes`}
+            value={Number.isNaN(props.minutes) ? "" : props.minutes}
+            onChange={(e) => props.onChange(e.target.valueAsNumber)}
+          />
+          min
+        </label>
+      )}
+    </fieldset>
   );
 }
 
-function Limits(props: { session: number; rest: number; onChange: (session: number, rest: number) => void }) {
-  return (
-    <>
-      <label>
-        Session <input type="number" min={1} value={props.session} onChange={(e) => props.onChange(e.target.valueAsNumber, props.rest)} /> min
-      </label>
-      <label>
-        Rest <input type="number" min={1} value={props.rest} onChange={(e) => props.onChange(props.session, e.target.valueAsNumber)} /> min
-      </label>
-    </>
-  );
-}
-
-function TargetItem({ view, target, entries, save }: { view: View; target: Target; entries: Entry[]; save: Save }) {
-  const desired = view.desired.targets.find((t) => t.id === target.id);
-  const [session, setSession] = useState((desired?.sessionMs ?? target.sessionMs) / MINUTE);
-  const [rest, setRest] = useState((desired?.restMs ?? target.restMs) / MINUTE);
+/** Adds a limit when `target` is null, otherwise edits it. */
+function Editor({ view, target, onSaved, onClose }: { view: View; target: Target | null; onSaved: () => void; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const desired = view.desired.targets.find((t) => t.id === target?.id);
+  const known = [...catalog, ...view.desired.customEntries];
+  const [chosen, setChosen] = useState<Entry[]>(() => desired?.entryIds.flatMap((id) => known.find((e) => e.id === id) ?? []) ?? []);
+  const [query, setQuery] = useState("");
+  const [name, setName] = useState(desired?.name ?? "");
+  const [session, setSession] = useState((desired?.sessionMs ?? 15 * MINUTE) / MINUTE);
+  const [rest, setRest] = useState((desired?.restMs ?? 60 * MINUTE) / MINUTE);
   const [error, setError] = useState<string | null>(null);
-  const status = view.statuses[target.id];
-  const domains = target.entryIds.flatMap((id) => entries.find((e) => e.id === id)?.domains ?? [id]);
-  const pending = pendingText(target, entries);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => dialog.current?.showModal(), []);
 
-  function edit(change: () => ConfigEdit) {
-    try {
-      save(change());
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  const isResting = (id: string) => view.statuses[id]?.blocked ?? false;
+  const title = target === null ? null : targetName(target, [...catalog, ...view.config.customEntries]);
+  const usedElsewhere = usedEntryIds({ ...view.desired, targets: view.desired.targets.filter((t) => t.id !== target?.id) });
+  const available = catalog.filter((e) => !usedElsewhere.has(e.id) && !chosen.some((c) => c.id === e.id));
+
+  function addSite() {
+    const text = query.trim();
+    if (text === "") return;
+    const domain = normalizeDomain(text);
+    const entry =
+      catalog.find((e) => e.name.toLowerCase() === text.toLowerCase()) ??
+      (domain === null ? null : entryForDomain([...catalog, ...chosen], view.desired, domain, () => crypto.randomUUID()));
+    if (entry === null) return setError(`"${text}" isn't a domain.`);
+    if (usedElsewhere.has(entry.id)) return setError(`${entry.name} already has limits.`);
+    if (!chosen.some((e) => e.id === entry.id)) setChosen([...chosen, entry]);
+    setQuery("");
+    setError(null);
   }
 
-  function apply(event: FormEvent) {
+  function onQueryKey(event: KeyboardEvent) {
+    if (event.key !== "Enter") return;
     event.preventDefault();
-    const invalid = limitsError(session, rest);
-    setError(invalid);
-    if (invalid === null) save(setLimits(view.desired, target.id, session, rest));
+    addSite();
+  }
+
+  async function submit(edit: () => ConfigEdit) {
+    let next: ConfigEdit;
+    try {
+      next = edit();
+    } catch (e) {
+      return setError((e as Error).message);
+    }
+    setBusy(true);
+    const result = await send({ type: "saveConfig", edit: next });
+    setBusy(false);
+    onSaved();
+    if (result.error === null) dialog.current?.close();
+    else setError(result.error);
+  }
+
+  function save(event: FormEvent) {
+    event.preventDefault();
+    const group = chosen.length > 1;
+    const invalid =
+      chosen.length === 0
+        ? "Add a site first."
+        : group && name.trim() === ""
+          ? "Give the group a name."
+          : limitsError(session, rest);
+    if (invalid !== null) return setError(invalid);
+    const edit = {
+      id: target?.id ?? crypto.randomUUID(),
+      name: group ? name.trim() : null,
+      entryIds: chosen.map((e) => e.id),
+      sessionMs: session * MINUTE,
+      restMs: rest * MINUTE,
+    };
+    void submit(() => saveTarget(view.desired, edit, chosen, view.config, isResting));
   }
 
   function remove() {
-    const resting = (id: string) => view.statuses[id]?.blocked ?? false;
-    save(removeTarget(view.desired, target.id, view.config, resting));
+    if (target !== null) void submit(() => removeTarget(view.desired, target.id, view.config, isResting));
   }
 
   return (
-    <li>
-      <div className="row">
-        <strong>{targetName(target, entries)}</strong>
-        <span className="muted">{domains.join(", ")}</span>
-      </div>
-      <div className="muted">
-        Session {formatMinutes(target.sessionMs)}, rest {formatMinutes(target.restMs)}
-        {status && <span className={status.blocked ? "blocked" : undefined}> · {statusText(status, view.now)}</span>}
-      </div>
-      {pending && <div>{pending}</div>}
-      {target.name !== null && <GroupSites view={view} targetId={target.id} entries={entries} edit={edit} />}
-      {desired && (
-        <form className="row" onSubmit={apply}>
-          <Limits session={session} rest={rest} onChange={(s, r) => (setSession(s), setRest(r))} />
-          <button type="submit">Save</button>
-          <button type="button" className="secondary" onClick={remove}>
-            Delete
+    <dialog ref={dialog} className="editor" onClose={onClose}>
+      <form onSubmit={save}>
+        <div className="dialog-head">
+          <h2>{title === null ? "Add limit" : `Edit ${title}`}</h2>
+          <button type="button" className="icon-button" aria-label="Close" onClick={() => dialog.current?.close()}>
+            <CloseIcon />
           </button>
-        </form>
-      )}
-      {error && <p className="error">{error}</p>}
-    </li>
+        </div>
+        {target !== null && isResting(target.id) && (
+          <p className="notice">{title} is resting. Stricter limits apply right away. Looser ones start when this rest ends.</p>
+        )}
+        <fieldset>
+          <legend className="label">Sites</legend>
+          {chosen.length > 0 && (
+            <div className="chips">
+              {chosen.map((e) => (
+                <span key={e.id} className="chip">
+                  {e.name}
+                  <button type="button" aria-label={`Remove ${e.name}`} onClick={() => setChosen(chosen.filter((c) => c.id !== e.id))}>
+                    <CloseIcon />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="add-site">
+            <input
+              list="catalog-sites"
+              placeholder="Site name or domain"
+              aria-label="Site name or domain"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onQueryKey}
+            />
+            <datalist id="catalog-sites">
+              {available.map((e) => (
+                <option key={e.id} value={e.name} />
+              ))}
+            </datalist>
+            <button type="button" className="outline" onClick={addSite}>
+              Add
+            </button>
+          </div>
+        </fieldset>
+        {chosen.length > 1 && (
+          <div>
+            <label className="label" htmlFor="limit-name">
+              Name
+            </label>
+            <input id="limit-name" className="full" placeholder="e.g. Short videos" value={name} onChange={(e) => setName(e.target.value)} />
+            <p className="hint">These sites share one session and one rest.</p>
+          </div>
+        )}
+        <DurationField label="Session" presets={SESSION_PRESETS} minutes={session} onChange={setSession} />
+        <DurationField label="Rest" presets={REST_PRESETS} minutes={rest} onChange={setRest} />
+        {error && <p className="error">{error}</p>}
+        <div className="dialog-foot">
+          {target !== null && (
+            <button type="button" className="danger inline" disabled={busy} onClick={remove}>
+              Delete
+            </button>
+          )}
+          <span className="spacer" />
+          <button type="button" className="outline" onClick={() => dialog.current?.close()}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={busy}>
+            Save
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 
-function AddTarget({ view, save, group }: { view: View; save: Save; group: boolean }) {
-  const [name, setName] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
-  const [domains, setDomains] = useState("");
-  const [session, setSession] = useState(15);
-  const [rest, setRest] = useState(60);
-  const [error, setError] = useState<string | null>(null);
-  const used = usedEntryIds(view.desired);
-  const available = catalog.filter((e) => !used.has(e.id));
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    try {
-      const unique = pickedEntries(view.desired, picked, domains);
-      if (group && name.trim() === "") throw new Error("Give the group a name.");
-      const invalid = limitsError(session, rest);
-      if (invalid !== null) throw new Error(invalid);
-      const target = {
-        id: crypto.randomUUID(),
-        name: group ? name.trim() : null,
-        entryIds: unique.map((e) => e.id),
-        sessionMs: session * MINUTE,
-        restMs: rest * MINUTE,
-      };
-      save(addTarget(view.desired, target, unique));
-      setName("");
-      setPicked([]);
-      setDomains("");
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+function LimitCard({ view, target, entries, onEdit }: { view: View; target: Target; entries: Entry[]; onEdit: () => void }) {
+  const name = targetName(target, entries);
+  const timer = limitTimer(view.statuses[target.id], target, view.now);
+  const sites =
+    target.name === null
+      ? target.entryIds.flatMap((id) => entries.find((e) => e.id === id)?.domains ?? [id])
+      : target.entryIds.map((id) => entries.find((e) => e.id === id)?.name ?? id);
+  const pending = pendingText(target, entries);
+  const editable = view.desired.targets.some((t) => t.id === target.id);
 
   return (
-    <form onSubmit={submit}>
-      {group ? (
-        <>
-          <p className="row">
-            <input placeholder="Group name" value={name} onChange={(e) => setName(e.target.value)} />
-          </p>
-          <p className="row">
-            {available.map((e) => (
-              <label key={e.id}>
-                <input
-                  type="checkbox"
-                  checked={picked.includes(e.id)}
-                  onChange={(ev) => setPicked(ev.target.checked ? [...picked, e.id] : picked.filter((id) => id !== e.id))}
-                />{" "}
-                {e.name}
-              </label>
-            ))}
-          </p>
-          <p className="row">
-            <input placeholder="Other domains, comma separated" value={domains} onChange={(e) => setDomains(e.target.value)} />
-          </p>
-        </>
-      ) : (
-        <p className="row">
-          <select value={picked[0] ?? ""} onChange={(e) => setPicked(e.target.value === "" ? [] : [e.target.value])}>
-            <option value="">Custom domain…</option>
-            {available.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-          {picked.length === 0 && (
-            <input placeholder="example.com" value={domains} onChange={(e) => setDomains(e.target.value)} />
-          )}
-        </p>
-      )}
-      <p className="row">
-        <Limits session={session} rest={rest} onChange={(s, r) => (setSession(s), setRest(r))} />
-        <button type="submit">{group ? "Create group" : "Add"}</button>
-      </p>
-      {error && <p className="error">{error}</p>}
-    </form>
+    <article className="card">
+      <div className="card-top">
+        <Tile name={name} />
+        <div className="grow">
+          <div className="name">{name}</div>
+          <div className="muted small ellipsis">{sites.join(", ")}</div>
+        </div>
+        <Pill phase={timer.phase} />
+      </div>
+      <Countdown timer={timer} />
+      <div className="card-foot muted small">
+        <span>
+          {timer.phase === "resting" ? `${formatMinutes(target.sessionMs)} sessions` : `Then ${formatMinutes(target.restMs)} rest`}
+        </span>
+        {editable && (
+          <button className="small" onClick={onEdit}>
+            <EditIcon />
+            Edit
+          </button>
+        )}
+      </div>
+      {pending && <p className="muted small">{pending}</p>}
+    </article>
   );
 }
 
 function Options() {
   const [view, refresh] = useView();
+  const [tab, setTab] = useState<"limits" | "account">("limits");
+  const [editing, setEditing] = useState<Target | "new" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (view === null) return null;
@@ -252,60 +262,84 @@ function Options() {
     setError(result.error);
     refresh();
   }
-  const save: Save = (edit) => void run({ type: "saveConfig", edit });
+
+  if (!view.signedIn) {
+    return (
+      <main className="center">
+        <div className="panel">
+          <Logo size={40} />
+          <h1>Sign in to Undoom</h1>
+          <p className="muted">Use a passkey to set limits and keep them in sync across your devices.</p>
+          {error && <p className="error">{error}</p>}
+          <button className="primary wide" disabled={busy} onClick={() => void run({ type: "signIn" })}>
+            <KeyIcon />
+            Sign in with a passkey
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   const entries = [...catalog, ...view.config.customEntries];
 
   return (
     <>
-      <h1>Undoom</h1>
-      {error && <p className="error">{error}</p>}
-      <section>
-        <h2>Account</h2>
-        {view.signedIn ? (
-          <div className="row">
-            <span>Signed in.</span>
-            <button className="secondary" disabled={busy} onClick={() => void run({ type: "addPasskey" })}>
+      <header className="topbar">
+        <Brand />
+        <nav className="tabs" role="tablist">
+          {(
+            [
+              ["limits", "Limits"],
+              ["account", "Account"],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <span className="spacer" />
+        {view.unsynced && <span className="muted small">Some changes haven't synced yet</span>}
+        <button className="primary small" disabled={!view.loaded} onClick={() => setEditing("new")}>
+          <PlusIcon />
+          Add limit
+        </button>
+      </header>
+      <main className="content" role="tabpanel">
+        {error && <p className="error">{error}</p>}
+        {tab === "account" ? (
+          <div className="card account">
+            <strong className="grow">Signed in with a passkey</strong>
+            <button className="outline" disabled={busy} onClick={() => void run({ type: "addPasskey" })}>
               Add a passkey
             </button>
-            <button className="secondary" disabled={busy} onClick={() => void run({ type: "signOut" })}>
+            <button disabled={busy} onClick={() => void run({ type: "signOut" })}>
               Sign out
             </button>
           </div>
+        ) : !view.loaded ? (
+          <p className="muted">Loading your limits…</p>
+        ) : view.config.targets.length === 0 ? (
+          <div className="card">
+            <strong>No limits yet</strong>
+            <p className="muted">Add a site or app to give it short sessions with a rest in between.</p>
+          </div>
         ) : (
-          <>
-            <p>Sign in with a passkey to set limits and sync them with your other devices.</p>
-            <button disabled={busy} onClick={() => void run({ type: "signIn" })}>
-              Sign in
-            </button>
-          </>
+          <div className="cards">
+            {view.config.targets.map((t) => (
+              <LimitCard key={t.id} view={view} target={t} entries={entries} onEdit={() => setEditing(t)} />
+            ))}
+          </div>
         )}
-      </section>
-      {view.signedIn && !view.loaded && <p className="muted">Loading your limits…</p>}
-      {view.signedIn && view.loaded && (
-        <>
-          <section>
-            <h2>Limits</h2>
-            {view.unsynced && <p className="muted">Some changes haven't synced yet.</p>}
-            {view.config.targets.length === 0 ? (
-              <p className="muted">No limits yet.</p>
-            ) : (
-              <ul className="list">
-                {view.config.targets.map((t) => (
-                  <TargetItem key={`${t.id}:${view.config.version}`} view={view} target={t} entries={entries} save={save} />
-                ))}
-              </ul>
-            )}
-          </section>
-          <section>
-            <h2>Add a site</h2>
-            <AddTarget view={view} save={save} group={false} />
-          </section>
-          <section>
-            <h2>Add a group</h2>
-            <p className="muted">Sites in a group share one session and one rest.</p>
-            <AddTarget view={view} save={save} group />
-          </section>
-        </>
+      </main>
+      {editing !== null && (
+        <Editor
+          key={editing === "new" ? "new" : editing.id}
+          view={view}
+          target={editing === "new" ? null : editing}
+          onSaved={refresh}
+          onClose={() => setEditing(null)}
+        />
       )}
     </>
   );

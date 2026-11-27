@@ -1,4 +1,4 @@
-import type { Entry, Status, Target } from "@undoom/engine";
+import type { Entry, Limits, Status, Target } from "@undoom/engine";
 
 export const MINUTE = 60_000;
 
@@ -20,10 +20,33 @@ export function formatMinutes(ms: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-export function statusText(s: Status, now: number): string {
-  return s.blocked && s.restUntil !== null
-    ? `Resting, ${formatCountdown(s.restUntil - now)} left`
-    : `${formatCountdown(s.remainingMs)} left in this session`;
+export interface Timer {
+  phase: "resting" | "session" | "ready";
+  /** What the big countdown shows. */
+  ms: number;
+  label: string;
+  /** Share of the progress bar to fill, 0 to 1. */
+  progress: number;
+}
+
+export function limitTimer(status: Status | undefined, target: Limits, now: number): Timer {
+  if (status?.blocked && status.restUntil !== null) {
+    const left = status.restUntil - now;
+    return { phase: "resting", ms: left, label: "until the next session", progress: clamp(1 - left / target.restMs) };
+  }
+  if (status !== undefined && status.remainingMs < target.sessionMs) {
+    return {
+      phase: "session",
+      ms: status.remainingMs,
+      label: `left of ${formatMinutes(target.sessionMs)}`,
+      progress: clamp(status.remainingMs / target.sessionMs),
+    };
+  }
+  return { phase: "ready", ms: target.sessionMs, label: "per session", progress: 1 };
+}
+
+function clamp(share: number): number {
+  return Math.min(1, Math.max(0, share));
 }
 
 export function targetName(target: Target, entries: readonly Entry[]): string {
