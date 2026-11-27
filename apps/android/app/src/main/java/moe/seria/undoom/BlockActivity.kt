@@ -6,15 +6,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -28,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -85,6 +95,8 @@ private fun BlockScreen(targetId: String, close: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Tile(targetEntries(target, saved), 72.dp)
+        Spacer(Modifier.height(16.dp))
         Text(displayName(target, saved), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
         Text("Time for a break", style = MaterialTheme.typography.titleMedium)
@@ -92,21 +104,32 @@ private fun BlockScreen(targetId: String, close: () -> Unit) {
         Text(formatDuration(status.restUntil - now), style = MaterialTheme.typography.displayLarge)
         Text("until your next session")
         Spacer(Modifier.height(48.dp))
-        if (!showUnlock) {
-            TextButton(onClick = { showUnlock = true }) { Text("Emergency unlock") }
-        } else {
-            Text("What is ${q.first} × ${q.second}?", style = MaterialTheme.typography.titleLarge)
-            if (wrong) Text("Not quite. Try this one.", color = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = answer,
-                onValueChange = { answer = it.filter(Char::isDigit) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { submit() }),
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = ::submit) { Text("Unlock") }
+        AnimatedContent(showUnlock, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "unlock") { unlocking ->
+            if (!unlocking) {
+                TextButton(onClick = { showUnlock = true }) { UnlockLabel("Emergency unlock") }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("What is ${q.first} × ${q.second}?", style = MaterialTheme.typography.titleLarge)
+                    AnimatedVisibility(wrong) { Text("Not quite. Try this one.", color = MaterialTheme.colorScheme.error) }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = answer,
+                        onValueChange = { answer = it.filter(Char::isDigit) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { submit() }),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = ::submit) { UnlockLabel("Unlock") }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun UnlockLabel(text: String) {
+    Icon(painterResource(R.drawable.ic_lock_open), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+    Text(text)
 }

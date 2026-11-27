@@ -1,8 +1,13 @@
 package moe.seria.undoom
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -10,20 +15,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private val lightColors = lightColorScheme(
     primary = Color(0xFF2B5A8A),
@@ -98,6 +114,61 @@ fun Logo(size: Dp) {
     Image(painterResource(R.drawable.logo), contentDescription = null, Modifier.size(size))
 }
 
+/** Loaded icons by package, so scrolling the app list doesn't decode them again. Only touched on the main thread. */
+private val appIcons = HashMap<String, ImageBitmap>()
+
+/** The icon of the first installed package, or null while loading or when none is installed. */
+@Composable
+private fun rememberAppIcon(packages: List<String>): ImageBitmap? {
+    val pm = LocalContext.current.packageManager
+    return produceState(packages.firstNotNullOfOrNull { appIcons[it] }, packages) {
+        if (value != null) return@produceState
+        value = withContext(Dispatchers.IO) {
+            packages.firstNotNullOfOrNull { runCatching { it to pm.getApplicationIcon(it).toBitmap().asImageBitmap() }.getOrNull() }
+        }?.let { (pkg, icon) -> icon.also { appIcons[pkg] = it } }
+    }.value
+}
+
+/** An entry's app icon, or its first letter when the app isn't installed. */
+@Composable
+fun EntryIcon(entry: Entry, size: Dp) {
+    val icon = rememberAppIcon(entry.packages)
+    Crossfade(icon, Modifier.size(size), label = "icon") {
+        Box(contentAlignment = Alignment.Center) {
+            if (it != null) {
+                Image(it, contentDescription = null, Modifier.size(size))
+            } else {
+                Text(
+                    entry.name.take(1).uppercase(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size.value * 0.7f).sp,
+                )
+            }
+        }
+    }
+}
+
+/** One entry's icon, or up to four in a grid for a group. */
+@Composable
+fun Tile(entries: List<Entry>, size: Dp = 34.dp) {
+    Box(
+        Modifier.size(size).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(size * 0.3f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (entries.size <= 1) {
+            entries.firstOrNull()?.let { EntryIcon(it, size * 0.65f) }
+        } else {
+            val small = size * 0.36f
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                for (row in entries.take(4).chunked(2)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { row.forEach { EntryIcon(it, small) } }
+                }
+            }
+        }
+    }
+}
+
 /** Server time, updated every second. */
 @Composable
 fun rememberNow(): Long {
@@ -138,3 +209,8 @@ fun entryName(id: String, saved: Saved) = entries(saved).find { it.id == id }?.n
 fun appNames(entryIds: List<String>, saved: Saved) = entryIds.joinToString { entryName(it, saved) }
 
 fun displayName(target: Target, saved: Saved) = target.name ?: appNames(target.entryIds, saved)
+
+/** The target's entries in order; ids missing from the catalog get a bare entry named after the id. */
+fun targetEntries(target: Target, saved: Saved) = entries(saved).let { all ->
+    target.entryIds.map { id -> all.find { it.id == id } ?: Entry(id, id, emptyList(), emptyList()) }
+}

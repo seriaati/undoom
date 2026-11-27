@@ -11,9 +11,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -76,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -122,10 +134,12 @@ private fun App(activity: MainActivity, resumes: Int) {
     var screen by remember { mutableStateOf<Screen>(Screen.Targets) }
     LaunchedEffect(resumes, token) { Repo.refresh() }
     BackHandler(screen != Screen.Targets) { screen = Screen.Targets }
-    when (val s = screen) {
-        Screen.Targets -> TargetsScreen(activity, resumes, saved, open = { screen = it })
-        Screen.Account -> AccountScreen(activity, token, back = { screen = Screen.Targets })
-        is Screen.Edit -> EditScreen(activity, saved, s.targetId, done = { screen = Screen.Targets })
+    AnimatedContent(screen, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(150)) }, label = "screen") { s ->
+        when (s) {
+            Screen.Targets -> TargetsScreen(activity, resumes, saved, open = { screen = it })
+            Screen.Account -> AccountScreen(activity, token, back = { screen = Screen.Targets })
+            is Screen.Edit -> EditScreen(activity, saved, s.targetId, done = { screen = Screen.Targets })
+        }
     }
 }
 
@@ -178,7 +192,7 @@ private fun SignInScreen(activity: MainActivity) {
         Button(
             onClick = { scope.launch { attempt({ error = it }) { Repo.signIn(if (creating) registerWithPasskey(activity) else signInWithPasskey(activity)) } } },
             Modifier.fillMaxWidth(),
-        ) { Text(if (creating) "Create account" else "Sign in with a passkey") }
+        ) { IconLabel(R.drawable.ic_key, if (creating) "Create account" else "Sign in with a passkey") }
         error?.let {
             Spacer(Modifier.height(16.dp))
             Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
@@ -240,10 +254,10 @@ private fun TargetsScreen(activity: MainActivity, resumes: Int, saved: Saved, op
             contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!enabled) item { Onboarding(activity) }
-            if (targets.isEmpty()) item { EmptyState() }
+            if (!enabled) item(key = "onboarding") { Box(Modifier.animateItem()) { Onboarding(activity) } }
+            if (targets.isEmpty()) item(key = "empty") { Box(Modifier.animateItem()) { EmptyState() } }
             items(targets, key = { it.id }) { target ->
-                LimitCard(target, saved, now, onClick = { open(Screen.Edit(target.id)) })
+                LimitCard(target, saved, now, onClick = { open(Screen.Edit(target.id)) }, Modifier.animateItem())
             }
         }
     }
@@ -262,40 +276,46 @@ private fun EmptyState() {
     }
 }
 
+private enum class Phase(val label: String, @DrawableRes val icon: Int) {
+    Resting("Resting", R.drawable.ic_moon),
+    Session("In session", R.drawable.ic_play),
+    Ready("Ready", R.drawable.ic_check),
+}
+
 @Composable
-private fun LimitCard(target: Target, saved: Saved, now: Long, onClick: () -> Unit) {
+private fun LimitCard(target: Target, saved: Saved, now: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val name = displayName(target, saved)
+    val members = targetEntries(target, saved)
     val status = status(Repo.localState(target, saved), target.limits, now)
     val restUntil = status.restUntil
     val ready = restUntil == null && status.remainingMs >= target.sessionMs
-    OutlinedCard(onClick, Modifier.fillMaxWidth(), enabled = target.pending != PendingChange.Delete) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val phase = when {
+        restUntil != null -> Phase.Resting
+        ready -> Phase.Ready
+        else -> Phase.Session
+    }
+    OutlinedCard(onClick, modifier.fillMaxWidth(), enabled = target.pending != PendingChange.Delete) {
+        Column(Modifier.animateContentSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Tile(name)
+                Tile(members)
                 Column(Modifier.weight(1f)) {
                     Text(name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    val sub = if (ready) {
-                        "${formatLimit(target.sessionMs)} · ${formatLimit(target.restMs)} rest"
-                    } else {
-                        target.name?.let { appNames(target.entryIds, saved) }
-                    }
-                    sub?.let { Muted(it, maxLines = 1) }
+                    target.name?.let { Muted(appNames(target.entryIds, saved), maxLines = 1) }
                 }
-                when {
-                    restUntil != null -> Pill("Resting", colors.errorContainer, colors.error)
-                    ready -> Pill("Ready", colors.background, colors.onSurfaceVariant)
-                    else -> Pill("In session", colors.primaryContainer, colors.primary)
-                }
+                Pill(phase)
             }
+            Identifiers(members)
             if (restUntil != null) {
                 Countdown(restUntil - now, "until the next session", colors.error)
                 Bar(1f - (restUntil - now).toFloat() / target.restMs, colors.error)
-                Muted("${formatLimit(target.sessionMs)} sessions")
             } else if (!ready) {
                 Countdown(status.remainingMs, "left of ${formatLimit(target.sessionMs)}", colors.onSurface)
                 Bar(status.remainingMs.toFloat() / target.sessionMs, colors.primary)
-                Muted("Then ${formatLimit(target.restMs)} rest")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                IconText(R.drawable.ic_hourglass, formatLimit(target.sessionMs), "Session")
+                IconText(R.drawable.ic_moon, formatLimit(target.restMs), "Rest")
             }
             when (target.pending) {
                 PendingChange.Delete -> Muted("Will be removed after the current rest")
@@ -306,25 +326,59 @@ private fun LimitCard(target: Target, saved: Saved, now: Long, onClick: () -> Un
     }
 }
 
+/** The domains and Android packages the entries cover, one line each. */
 @Composable
-private fun Tile(name: String) {
-    Box(
-        Modifier.size(34.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(name.take(1).uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+private fun Identifiers(entries: List<Entry>) {
+    val domains = entries.flatMap { it.domains }
+    val packages = entries.flatMap { it.packages }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (domains.isNotEmpty()) IconText(R.drawable.ic_globe, domains.joinToString(), "Websites")
+        if (packages.isNotEmpty()) IconText(R.drawable.ic_smartphone, packages.joinToString(), "Android apps", FontFamily.Monospace)
     }
 }
 
 @Composable
-private fun Pill(text: String, background: Color, color: Color) {
-    Text(
-        text,
-        Modifier.background(background, CircleShape).padding(horizontal = 8.dp, vertical = 4.dp),
-        color = color,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-    )
+private fun IconText(@DrawableRes icon: Int, text: String, description: String, fontFamily: FontFamily? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(painterResource(icon), contentDescription = description, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = fontFamily,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun IconLabel(@DrawableRes icon: Int, text: String) {
+    Icon(painterResource(icon), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+    Text(text)
+}
+
+@Composable
+private fun Pill(phase: Phase) {
+    val colors = MaterialTheme.colorScheme
+    val (background, content) = when (phase) {
+        Phase.Resting -> colors.errorContainer to colors.error
+        Phase.Session -> colors.primaryContainer to colors.primary
+        Phase.Ready -> colors.background to colors.onSurfaceVariant
+    }
+    val animatedBackground by animateColorAsState(background, label = "pill background")
+    val animatedContent by animateColorAsState(content, label = "pill content")
+    AnimatedContent(phase, Modifier.background(animatedBackground, CircleShape), label = "pill") { shown ->
+        Row(
+            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(painterResource(shown.icon), contentDescription = null, Modifier.size(12.dp), tint = animatedContent)
+            Text(shown.label, color = animatedContent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        }
+    }
 }
 
 @Composable
@@ -345,8 +399,10 @@ private fun Countdown(ms: Long, label: String, color: Color) {
 
 @Composable
 private fun Bar(fraction: Float, color: Color) {
+    // Matches the one-second tick so the bar glides instead of stepping.
+    val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(1_000, easing = LinearEasing), label = "bar")
     Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().clip(CircleShape).background(color))
+        Box(Modifier.fillMaxWidth(animated).fillMaxHeight().clip(CircleShape).background(color))
     }
 }
 
@@ -430,12 +486,12 @@ private fun AccountScreen(activity: MainActivity, token: String, back: () -> Uni
                                     message = "Passkey added"
                                 }
                             }
-                        }) { Text("Add a passkey") }
-                        TextButton(onClick = { Repo.signOut() }) { Text("Sign out") }
+                        }) { IconLabel(R.drawable.ic_key, "Add a passkey") }
+                        TextButton(onClick = { Repo.signOut() }) { IconLabel(R.drawable.ic_logout, "Sign out") }
                     }
                 }
             }
-            message?.let { Text(it, Modifier.padding(horizontal = 16.dp)) }
+            AnimatedVisibility(message != null) { Text(message.orEmpty(), Modifier.padding(horizontal = 16.dp)) }
         }
     }
 }
@@ -511,10 +567,10 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                 },
                 actions = {
                     if (existing != null) {
-                        TextButton(
+                        IconButton(
                             onClick = { save(desired.targets.filter { it.id != targetId }) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text("Delete") }
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) { Icon(painterResource(R.drawable.ic_delete), contentDescription = "Delete") }
                     }
                     Button(
                         enabled = error == null,
@@ -523,7 +579,7 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                             save(if (existing == null) desired.targets + edit else desired.targets.map { if (it.id == edit.id) edit else it })
                         },
                         modifier = Modifier.padding(end = 8.dp),
-                    ) { Text("Save") }
+                    ) { IconLabel(R.drawable.ic_check, "Save") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
@@ -539,15 +595,19 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                    if (selected.isNotEmpty()) {
+                    AnimatedVisibility(selected.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             FieldLabel("Selected")
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FlowRow(Modifier.animateContentSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 for (id in selected) {
+                                    val entry = all.find { it.entry.id == id }?.entry
+                                        ?: known.find { it.id == id }
+                                        ?: Entry(id, id, emptyList(), emptyList())
                                     InputChip(
                                         selected = false,
                                         onClick = { selected.remove(id) },
-                                        label = { Text(all.find { it.entry.id == id }?.entry?.name ?: entryName(id, saved)) },
+                                        label = { Text(entry.name) },
+                                        avatar = { EntryIcon(entry, InputChipDefaults.AvatarSize) },
                                         trailingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = "Remove", Modifier.size(16.dp)) },
                                         shape = CircleShape,
                                     )
@@ -556,7 +616,7 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                         }
                     }
                     // Also shown for an existing single-app limit that has a name, so the name can still be changed.
-                    if (selected.size > 1 || existing?.name != null) {
+                    AnimatedVisibility(selected.size > 1 || existing?.name != null) {
                         OutlinedTextField(
                             name, { name = it }, Modifier.fillMaxWidth(),
                             label = { Text("Name") },
@@ -570,7 +630,12 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         FieldLabel("Apps")
-                        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("Search apps") }, singleLine = true)
+                        OutlinedTextField(
+                            query, { query = it }, Modifier.fillMaxWidth(),
+                            placeholder = { Text("Search apps") },
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
+                            singleLine = true,
+                        )
                     }
                 }
             }
@@ -578,10 +643,12 @@ private fun EditScreen(activity: MainActivity, saved: Saved, targetId: String?, 
                 .sortedBy { it.entry.id !in selected }
             items(shown, key = { it.entry.id }) { (entry, installed) ->
                 Row(
-                    Modifier.fillMaxWidth().clickable { if (!selected.remove(entry.id)) selected += entry.id },
+                    Modifier.animateItem().fillMaxWidth().clickable { if (!selected.remove(entry.id)) selected += entry.id },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(entry.id in selected, onCheckedChange = null, Modifier.padding(12.dp))
+                    EntryIcon(entry, 32.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column {
                         Text(entry.name)
                         Muted((if (installed) "" else "Not installed · ") + entry.packages.joinToString())
@@ -621,7 +688,7 @@ private fun DurationPicker(label: String, presets: List<Long>, minutes: String, 
             }
             FilterChip(selected = custom, onClick = { custom = true }, label = { Text("Custom") }, colors = chipColors)
         }
-        if (custom) {
+        AnimatedVisibility(custom) {
             OutlinedTextField(
                 minutes, { onChange(it.filter(Char::isDigit)) }, Modifier.width(160.dp),
                 suffix = { Text("min") }, singleLine = true,
