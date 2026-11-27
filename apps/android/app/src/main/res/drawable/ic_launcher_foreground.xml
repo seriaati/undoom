@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- An hourglass, inside the 72dp safe zone of the 108dp adaptive icon. -->
+<!-- The "full stop" mark from apps/server/public/favicon.svg (32 grid), scaled 2.4x into the 72dp safe zone of the 108dp adaptive icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,32h32v4h-3v6c0,6 -5,10 -9,12c4,2 9,6 9,12v6h3v4h-32v-4h3v-6c0,-6 5,-10 9,-12c-4,-2 -9,-6 -9,-12v-6h-3z" />
+    <group
+        android:scaleX="2.4"
+        android:scaleY="2.4"
+        android:translateX="15.6"
+        android:translateY="15.6">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M9.2,8.6h12.8a1.6,1.6 0,0 1,0 3.2h-12.8a1.6,1.6 0,0 1,0 -3.2z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M9.2,14h12.8a1.6,1.6 0,0 1,0 3.2h-12.8a1.6,1.6 0,0 1,0 -3.2z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M9.2,19.4h4.8a1.6,1.6 0,0 1,0 3.2h-4.8a1.6,1.6 0,0 1,0 -3.2z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M19.6,21a2.4,2.4 0,1 0,4.8 0a2.4,2.4 0,1 0,-4.8 0z" />
+    </group>
 </vector>
