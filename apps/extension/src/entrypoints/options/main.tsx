@@ -336,17 +336,19 @@ function Options() {
       <main key={tab} className="content" role="tabpanel">
         {error && <p className="error">{error}</p>}
         {tab === "account" ? (
-          <div className="card account">
-            <KeyIcon />
-            <strong className="grow">Signed in with a passkey</strong>
-            <button className="outline" disabled={busy} onClick={() => void run({ type: "addPasskey" })}>
-              <PlusIcon />
-              Add a passkey
-            </button>
-            <button disabled={busy} onClick={() => void run({ type: "signOut" })}>
-              <LogOutIcon />
-              Sign out
-            </button>
+          <div className="card">
+            <h2>Signed in with a passkey</h2>
+            <p className="muted">Add a passkey on another device or password manager so you can still sign in if you lose this one.</p>
+            <div className="actions">
+              <button className="outline" disabled={busy} onClick={() => void run({ type: "addPasskey" })}>
+                <KeyIcon />
+                Add a passkey
+              </button>
+              <button disabled={busy} onClick={() => void run({ type: "signOut" })}>
+                <LogOutIcon />
+                Sign out
+              </button>
+            </div>
           </div>
         ) : !view.loaded ? (
           <p className="muted">Loading your limits…</p>

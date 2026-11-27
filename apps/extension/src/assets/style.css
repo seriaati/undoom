@@ -285,10 +285,9 @@ input.full { width: 100%; }
   gap: 12px;
 }
 .card-foot { justify-content: space-between; }
-.card.account {
+.actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
 }
 @media (max-width: 640px) {
