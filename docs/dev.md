@@ -45,3 +45,6 @@ Debug builds talk to `http://10.0.2.2:8787`, which is the host machine's
 3. Set `ANDROID_CERT_FINGERPRINTS` in `wrangler.jsonc` to the release signing
    certificate's SHA-256 fingerprint (`keytool -list -v -keystore <keystore>`).
 4. `pnpm run deploy` from `apps/server`. This serves `undoom.seria.moe` as a custom domain.
+After that, pushes to `main` that touch the server, engine or catalog apply
+migrations and deploy automatically (`.github/workflows/deploy.yml`, using the
+`CLOUDFLARE_API_TOKEN` repository secret).
