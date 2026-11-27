@@ -2,10 +2,10 @@ import catalog from "@undoom/catalog";
 import { type FormEvent, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "@/assets/style.css";
-import { Brand, Countdown } from "@/components/ui";
+import { ArrowLeftIcon, Brand, Countdown, Tile, UnlockIcon } from "@/components/ui";
 import { parseBlockPage } from "@/lib/block";
 import { send, useView } from "@/lib/client";
-import { limitTimer, targetName } from "@/lib/format";
+import { limitTimer, targetEntries, targetName } from "@/lib/format";
 import { isCorrect, newQuestion } from "@/lib/question";
 
 const { targetId, url } = parseBlockPage(location.search);
@@ -34,6 +34,7 @@ function Unlock({ onUnlock }: { onUnlock: () => void }) {
         <label htmlFor="answer">{question.text} =</label>
         <input id="answer" inputMode="numeric" autoComplete="off" value={answer} onChange={(e) => setAnswer(e.target.value)} />
         <button type="submit" className="primary">
+          <UnlockIcon />
           Unlock
         </button>
       </div>
@@ -49,19 +50,25 @@ function Blocked() {
 
   const target = view.config.targets.find((t) => t.id === targetId);
   const status = view.statuses[targetId];
-  const name = target ? targetName(target, [...catalog, ...view.config.customEntries]) : "This site";
+  const entries = [...catalog, ...view.config.customEntries];
+  const name = target ? targetName(target, entries) : "This site";
+  const tile = target && <Tile entries={targetEntries(target, entries)} large />;
 
   if (target && status?.blocked && status.restUntil !== null) {
     return (
       <main className="center">
         <div className="panel">
           <Brand />
-          <h1>{name} is resting</h1>
+          <div className="panel-title">
+            {tile}
+            <h1>{name} is resting</h1>
+          </div>
           <Countdown timer={limitTimer(status, target, view.now)} />
           {unlocking ? (
             <Unlock onUnlock={refresh} />
           ) : (
             <button className="muted inline" onClick={() => setUnlocking(true)}>
+              <UnlockIcon />
               I need it now
             </button>
           )}
@@ -73,8 +80,16 @@ function Blocked() {
     <main className="center">
       <div className="panel">
         <Brand />
-        <h1>{name} is open again</h1>
-        {url && <a href={url}>Go back to {new URL(url).hostname}</a>}
+        <div className="panel-title">
+          {tile}
+          <h1>{name} is open again</h1>
+        </div>
+        {url && (
+          <a className="back" href={url}>
+            <ArrowLeftIcon />
+            Go back to {new URL(url).hostname}
+          </a>
+        )}
       </div>
     </main>
   );

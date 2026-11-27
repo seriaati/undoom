@@ -58,6 +58,18 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.96); } }
 
 button {
   font: inherit;
@@ -73,7 +85,11 @@ button {
   color: var(--fg);
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s, transform 0.1s;
 }
+/* An inset tint darkens or lightens any background, including transparent and primary buttons. */
+button:not(:disabled):hover { box-shadow: inset 0 0 0 999px rgb(128 128 128 / 0.12); }
+button:not(:disabled):active { transform: scale(0.96); }
 button:disabled { opacity: 0.5; cursor: default; }
 button:focus-visible, input:focus-visible {
   outline: 2px solid var(--accent);
@@ -97,6 +113,7 @@ button.inline {
   border-radius: 50%;
   color: var(--muted);
 }
+button.icon-only { padding-inline: 10px; }
 .icon { width: 16px; height: 16px; flex: none; }
 input {
   font: inherit;
@@ -130,14 +147,42 @@ input.full { width: 100%; }
   background: var(--surface);
   color: var(--muted);
   font-weight: 700;
+  overflow: hidden;
 }
+.favicon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  object-fit: contain;
+  animation: fade 0.3s ease-out;
+}
+.favicon.letter { font-size: 14px; line-height: 1; }
+.tile.group {
+  grid-template-columns: repeat(2, 12px);
+  place-content: center;
+  gap: 2px;
+}
+.tile.group .favicon { width: 12px; height: 12px; border-radius: 3px; font-size: 8px; }
+.tile.large { width: 56px; height: 56px; border-radius: 16px; }
+.tile.large .favicon { width: 32px; height: 32px; font-size: 22px; }
+.tile.large.group { grid-template-columns: repeat(2, 20px); gap: 4px; }
+.tile.large.group .favicon { width: 20px; height: 20px; font-size: 12px; }
 .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
+  transition: background-color 0.3s, color 0.3s;
 }
+.pill .icon { width: 12px; height: 12px; stroke-width: 2.5; }
+.pill.icon-only { padding: 6px; }
 .pill.session { background: var(--accent-soft); color: var(--accent); }
 .pill.resting { background: var(--rest-soft); color: var(--rest); }
 .pill.ready { background: var(--bg); color: var(--muted); }
@@ -146,6 +191,7 @@ input.full { width: 100%; }
   font-weight: 800;
   letter-spacing: -0.02em;
   white-space: nowrap;
+  transition: color 0.3s;
 }
 .count.resting { color: var(--rest); }
 .big {
@@ -165,6 +211,8 @@ input.full { width: 100%; }
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
+  /* Matches the one-second tick so the bar glides instead of stepping. */
+  transition: width 1s linear, background-color 0.3s;
 }
 .progress.resting > i { background: var(--rest); }
 
@@ -208,6 +256,29 @@ input.full { width: 100%; }
   border-radius: 16px;
   background: var(--surface);
 }
+.card, .rows li, .panel {
+  animation: rise 0.3s ease-out both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.identifiers { display: grid; gap: 2px; }
+.identifier {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.identifier .icon { width: 13px; height: 13px; }
+.identifier.packages span { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.durations { display: inline-flex; gap: 12px; }
+.durations > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.durations .icon { width: 13px; height: 13px; }
 .card-top, .card-foot {
   display: flex;
   align-items: center;
@@ -236,6 +307,9 @@ dialog {
   box-shadow: 0 20px 50px rgb(0 0 0 / 0.3);
 }
 dialog::backdrop { background: rgb(10 16 28 / 0.42); }
+dialog[open] { animation: pop 0.2s ease-out; }
+dialog[open]::backdrop { animation: fade 0.2s ease-out; }
+.error, .notice { animation: fade 0.2s ease-out; }
 dialog form { display: grid; gap: 16px; }
 .dialog-head, .dialog-foot {
   display: flex;
@@ -278,11 +352,13 @@ fieldset {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 4px 4px 12px;
+  padding: 4px 4px 4px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
   font-weight: 500;
+  animation: pop 0.15s ease-out;
 }
+.chip .favicon { width: 16px; height: 16px; font-size: 11px; color: var(--muted); }
 .chip button {
   padding: 4px;
   border-radius: 50%;
@@ -315,6 +391,7 @@ fieldset {
   gap: 8px;
   margin-top: 8px;
   color: var(--muted);
+  animation: rise 0.2s ease-out;
 }
 .minutes input { width: 96px; color: var(--fg); }
 
@@ -335,11 +412,23 @@ fieldset {
   background: var(--surface);
 }
 .panel .big .count { font-size: 40px; }
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+a.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
 .unlock {
   display: grid;
   gap: 8px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
+  animation: rise 0.25s ease-out;
 }
 .unlock-row {
   display: flex;
@@ -376,3 +465,10 @@ fieldset {
 }
 .rows .count { font-size: 15px; }
 .rows .count.session { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::backdrop {
+    animation: none !important;
+    transition: none !important;
+  }
+}

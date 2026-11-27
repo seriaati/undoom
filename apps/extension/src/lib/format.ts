@@ -55,6 +55,11 @@ export function targetName(target: Target, entries: readonly Entry[]): string {
   return entries.find((e) => e.id === id)?.name ?? id;
 }
 
+/** The target's entries in order; ids missing from `entries` get a bare entry named after the id. */
+export function targetEntries(target: Target, entries: readonly Entry[]): Entry[] {
+  return target.entryIds.map((id) => entries.find((e) => e.id === id) ?? { id, name: id, domains: [], packages: [] });
+}
+
 export function pendingText(target: Target, entries: readonly Entry[]): string | null {
   const pending = target.pending;
   if (pending === null) return null;

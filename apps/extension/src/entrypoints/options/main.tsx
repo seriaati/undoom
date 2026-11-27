@@ -1,9 +1,27 @@
 import catalog from "@undoom/catalog";
 import type { ConfigEdit, Entry, Target } from "@undoom/engine";
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "@/assets/style.css";
-import { Brand, CloseIcon, Countdown, EditIcon, KeyIcon, Logo, Pill, PlusIcon, Tile } from "@/components/ui";
+import {
+  Brand,
+  CheckIcon,
+  CloseIcon,
+  Countdown,
+  Durations,
+  EditIcon,
+  Favicon,
+  Identifiers,
+  KeyIcon,
+  ListIcon,
+  Logo,
+  LogOutIcon,
+  Pill,
+  PlusIcon,
+  Tile,
+  TrashIcon,
+  UserIcon,
+} from "@/components/ui";
 import { send, useView } from "@/lib/client";
 import {
   entryForDomain,
@@ -13,7 +31,7 @@ import {
   saveTarget,
   usedEntryIds,
 } from "@/lib/editor";
-import { formatMinutes, limitTimer, MINUTE, pendingText, targetName } from "@/lib/format";
+import { formatMinutes, limitTimer, MINUTE, pendingText, targetEntries, targetName } from "@/lib/format";
 import type { Request, View } from "@/lib/messages";
 
 const SESSION_PRESETS = [5, 10, 15, 30, 60];
@@ -150,7 +168,8 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
           {chosen.length > 0 && (
             <div className="chips">
               {chosen.map((e) => (
-                <span key={e.id} className="chip">
+                <span key={e.id} className="chip" title={[...e.domains, ...e.packages].join(", ")}>
+                  <Favicon entry={e} />
                   {e.name}
                   <button type="button" aria-label={`Remove ${e.name}`} onClick={() => setChosen(chosen.filter((c) => c.id !== e.id))}>
                     <CloseIcon />
@@ -173,8 +192,8 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
                 <option key={e.id} value={e.name} />
               ))}
             </datalist>
-            <button type="button" className="outline" onClick={addSite}>
-              Add
+            <button type="button" className="outline icon-only" aria-label="Add site" title="Add site" onClick={addSite}>
+              <PlusIcon />
             </button>
           </div>
         </fieldset>
@@ -192,8 +211,8 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
         {error && <p className="error">{error}</p>}
         <div className="dialog-foot">
           {target !== null && (
-            <button type="button" className="danger inline" disabled={busy} onClick={remove}>
-              Delete
+            <button type="button" className="icon-button danger" aria-label="Delete limit" title="Delete limit" disabled={busy} onClick={remove}>
+              <TrashIcon />
             </button>
           )}
           <span className="spacer" />
@@ -201,6 +220,7 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
             Cancel
           </button>
           <button type="submit" className="primary" disabled={busy}>
+            <CheckIcon />
             Save
           </button>
         </div>
@@ -209,35 +229,42 @@ function Editor({ view, target, onSaved, onClose }: { view: View; target: Target
   );
 }
 
-function LimitCard({ view, target, entries, onEdit }: { view: View; target: Target; entries: Entry[]; onEdit: () => void }) {
+function LimitCard({
+  view,
+  target,
+  entries,
+  index,
+  onEdit,
+}: {
+  view: View;
+  target: Target;
+  entries: Entry[];
+  index: number;
+  onEdit: () => void;
+}) {
   const name = targetName(target, entries);
   const timer = limitTimer(view.statuses[target.id], target, view.now);
-  const sites =
-    target.name === null
-      ? target.entryIds.flatMap((id) => entries.find((e) => e.id === id)?.domains ?? [id])
-      : target.entryIds.map((id) => entries.find((e) => e.id === id)?.name ?? id);
+  const members = targetEntries(target, entries);
   const pending = pendingText(target, entries);
   const editable = view.desired.targets.some((t) => t.id === target.id);
 
   return (
-    <article className="card">
+    <article className="card" style={{ "--i": index } as CSSProperties}>
       <div className="card-top">
-        <Tile name={name} />
+        <Tile entries={members} />
         <div className="grow">
-          <div className="name">{name}</div>
-          <div className="muted small ellipsis">{sites.join(", ")}</div>
+          <div className="name ellipsis">{name}</div>
+          {target.name !== null && <div className="muted small ellipsis">{members.map((e) => e.name).join(", ")}</div>}
         </div>
         <Pill phase={timer.phase} />
       </div>
+      <Identifiers entries={members} />
       <Countdown timer={timer} />
       <div className="card-foot muted small">
-        <span>
-          {timer.phase === "resting" ? `${formatMinutes(target.sessionMs)} sessions` : `Then ${formatMinutes(target.restMs)} rest`}
-        </span>
+        <Durations sessionMs={target.sessionMs} restMs={target.restMs} />
         {editable && (
-          <button className="small" onClick={onEdit}>
+          <button className="icon-button" aria-label={`Edit ${name}`} title="Edit" onClick={onEdit}>
             <EditIcon />
-            Edit
           </button>
         )}
       </div>
@@ -289,11 +316,12 @@ function Options() {
         <nav className="tabs" role="tablist">
           {(
             [
-              ["limits", "Limits"],
-              ["account", "Account"],
+              ["limits", "Limits", <ListIcon />],
+              ["account", "Account", <UserIcon />],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, label, icon]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+              {icon}
               {label}
             </button>
           ))}
@@ -305,15 +333,18 @@ function Options() {
           Add limit
         </button>
       </header>
-      <main className="content" role="tabpanel">
+      <main key={tab} className="content" role="tabpanel">
         {error && <p className="error">{error}</p>}
         {tab === "account" ? (
           <div className="card account">
+            <KeyIcon />
             <strong className="grow">Signed in with a passkey</strong>
             <button className="outline" disabled={busy} onClick={() => void run({ type: "addPasskey" })}>
+              <PlusIcon />
               Add a passkey
             </button>
             <button disabled={busy} onClick={() => void run({ type: "signOut" })}>
+              <LogOutIcon />
               Sign out
             </button>
           </div>
@@ -326,8 +357,8 @@ function Options() {
           </div>
         ) : (
           <div className="cards">
-            {view.config.targets.map((t) => (
-              <LimitCard key={t.id} view={view} target={t} entries={entries} onEdit={() => setEditing(t)} />
+            {view.config.targets.map((t, i) => (
+              <LimitCard key={t.id} view={view} target={t} entries={entries} index={i} onEdit={() => setEditing(t)} />
             ))}
           </div>
         )}
